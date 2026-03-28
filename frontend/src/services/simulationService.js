@@ -5,7 +5,8 @@
 import { supabase } from '../lib/supabase';
 import { demoSimulations } from '../data/demoSimulations';
 
-const USE_MOCK = !supabase;
+// Simulation backend endpoints don't exist yet — keep mock on until they are built
+const USE_MOCK = true;
 const API_BASE = '/api';
 
 /**

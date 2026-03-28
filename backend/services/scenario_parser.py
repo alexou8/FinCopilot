@@ -1,9 +1,9 @@
 import json
 import logging
 
-from app.services.llm import chat_completion
-from app.prompts.scenario import SCENARIO_PARSE_SYSTEM_PROMPT, SCENARIO_EXPLAIN_SYSTEM_PROMPT
-from app.models.schemas import (
+from backend.services.llm import chat_completion
+from backend.prompts.scenario import SCENARIO_PARSE_SYSTEM_PROMPT, SCENARIO_EXPLAIN_SYSTEM_PROMPT
+from backend.models.schemas import (
     FinancialProfile,
     ScenarioChanges,
     ScenarioParseResponse,

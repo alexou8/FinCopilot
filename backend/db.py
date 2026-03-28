@@ -1,5 +1,5 @@
 import logging
-from app.config import SUPABASE_URL, SUPABASE_KEY
+from backend.config import SUPABASE_URL, SUPABASE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,12 @@ async def get_profile(user_id: str) -> dict | None:
         return _profiles.get(user_id)
     response = (
         supabase.table("financial_profiles")
-        .select("profile_data")
+        .select("profile_data_after")
         .eq("user_id", user_id)
         .execute()
     )
     if response.data:
-        return response.data[0]["profile_data"]
+        return response.data[0]["profile_data_after"]
     return None
 
 
@@ -66,6 +66,12 @@ async def upsert_profile(user_id: str, data: dict) -> None:
     if _use_memory:
         _profiles[user_id] = data
         return
+    # Read current profile into profile_data_before for history, write new into profile_data_after
+    current = await get_profile(user_id)
     supabase.table("financial_profiles").upsert(
-        {"user_id": user_id, "profile_data": data}
+        {
+            "user_id": user_id,
+            "profile_data_before": current or data,
+            "profile_data_after": data,
+        }
     ).execute()

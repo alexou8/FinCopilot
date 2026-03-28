@@ -1,9 +1,9 @@
 import json
 import logging
 
-from app.models.schemas import FinancialProfile, Issue
-from app.services.llm import chat_completion
-from app.prompts.explanation import ISSUE_EXPLANATION_SYSTEM_PROMPT
+from backend.models.schemas import FinancialProfile, Issue
+from backend.services.llm import chat_completion
+from backend.prompts.explanation import ISSUE_EXPLANATION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

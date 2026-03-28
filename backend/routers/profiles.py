@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import FinancialProfile
-from app.services.profile_repository import (
+from backend.models.schemas import FinancialProfile
+from backend.services.profile_repository import (
     get_profile_by_user_id,
     upsert_profile_by_user_id,
 )

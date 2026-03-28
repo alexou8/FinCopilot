@@ -1,5 +1,5 @@
-from app.db import get_profile, upsert_profile
-from app.models.schemas import FinancialProfile
+from backend.db import get_profile, upsert_profile
+from backend.models.schemas import FinancialProfile
 
 
 async def get_profile_by_user_id(user_id: str) -> FinancialProfile | None:
