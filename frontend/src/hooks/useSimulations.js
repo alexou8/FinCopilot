@@ -5,26 +5,23 @@ import { useApp } from '../context/AppContext';
 import { runSimulation, getSimulations, deleteSimulation } from '../services/simulationService';
 
 export function useSimulations() {
-  const { simulations, setSimulations, activeSimulation, setActiveSimulation, profile } = useApp();
+  const { simulations, setSimulations, activeSimulation, setActiveSimulation, profile, authUser } = useApp();
 
-  const fetchHistory = useCallback(async (userId = 'demo-user') => {
+  const userId = authUser?.id ?? 'demo_user';
+
+  const fetchHistory = useCallback(async () => {
     try {
       const results = await getSimulations(userId);
       setSimulations(results);
     } catch (err) {
       console.error('Failed to fetch simulations:', err);
     }
-  }, [setSimulations]);
+  }, [userId, setSimulations]);
 
   const run = useCallback(async (prompt) => {
     if (!prompt?.trim()) return null;
     try {
-      const result = await runSimulation({
-        prompt,
-        profileBefore: profile,
-        // profileAfter is derived by the backend AI from the prompt
-      });
-      // Prepend to history and set as active
+      const result = await runSimulation({ prompt, profileBefore: profile }, userId);
       setSimulations(prev => [result, ...prev]);
       setActiveSimulation(result);
       return result;
@@ -32,11 +29,11 @@ export function useSimulations() {
       console.error('Simulation failed:', err);
       return null;
     }
-  }, [profile, setSimulations, setActiveSimulation]);
+  }, [profile, userId, setSimulations, setActiveSimulation]);
 
-  const remove = useCallback(async (id, userId = 'demo-user') => {
+  const remove = useCallback(async (id) => {
     try {
-      await deleteSimulation(id, userId);
+      await deleteSimulation(id);
       setSimulations(prev => prev.filter(s => s.id !== id));
       if (activeSimulation?.id === id) setActiveSimulation(null);
     } catch (err) {

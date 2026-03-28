@@ -5,13 +5,13 @@ import { useApp } from '../context/AppContext';
 import { getProfile } from '../services/profileService';
 
 export function useProfile() {
-  const { profile, setProfile, updatedFields } = useApp();
+  const { profile, setProfile, updatedFields, authUser, isDemo } = useApp();
 
   useEffect(() => {
-    if (!profile) {
-      getProfile().then(setProfile).catch(console.error);
-    }
-  }, []);
+    if (isDemo || profile) return;
+    const userId = authUser?.id ?? 'demo_user';
+    getProfile(userId).then(setProfile).catch(console.error);
+  }, [authUser?.id]);
 
   return { profile, updatedFields };
 }

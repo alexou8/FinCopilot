@@ -193,9 +193,12 @@ export default function LoginPage() {
             type="button"
             className="neu-btn"
             style={{ width: '100%', padding: '12px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontFamily: FONT, fontSize: '14px', fontWeight: 500, color: 'var(--ink)' }}
-            onClick={() => {
-              // TODO: supabase.auth.signInWithOAuth({ provider: 'google' })
-              alert('Google sign-in — configure Supabase OAuth provider to enable.');
+            onClick={async () => {
+              const { supabase } = await import('../../lib/supabase');
+              supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: `${window.location.origin}/dashboard` },
+              });
             }}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">

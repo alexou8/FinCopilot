@@ -192,3 +192,47 @@ class ScenarioExplainResponse(BaseModel):
     path_a_advantage: str
     risk: str
     recommendation: str
+
+
+# ── Simulations ──────────────────────────────────────────────────────
+
+class RunSimulationRequest(BaseModel):
+    user_id: str
+    scenario_name: str   # e.g. "Can I afford to move out?"
+    prompt: str          # natural language description of the change
+
+
+class MonthlyNetWorthPoint(BaseModel):
+    month: str   # "2026-04"
+    value: float
+
+
+class SimulationSummary(BaseModel):
+    debt_total: float
+    account_total: float
+    monthly_income: float
+    monthly_expenses: float
+    monthly_surplus: float
+
+
+class SimulationRecommendation(BaseModel):
+    feasible: bool
+    headline: str
+    body: str
+    recommendations: list[str]
+
+
+class SimulationRecord(BaseModel):
+    id: int | None = None
+    user_id: str
+    scenario_key: str
+    scenario_name: str
+    months: int
+    monthly_net_worth_before: list[MonthlyNetWorthPoint]
+    monthly_net_worth_after: list[MonthlyNetWorthPoint]
+    summary_before: SimulationSummary
+    summary_after: SimulationSummary
+    recommendation: SimulationRecommendation
+    profile_data_before: dict | None = None
+    profile_data_after: dict | None = None
+    created_at: str | None = None

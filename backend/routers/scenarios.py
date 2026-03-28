@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import (
+from backend.models.schemas import (
     ScenarioCompareRequest,
     ScenarioCompareResponse,
     ScenarioExplainRequest,
     ScenarioExplainResponse,
     FinancialProfile,
 )
-from app.services.scenario_parser import parse_decision, explain_comparison
-from app.db import get_profile
+from backend.services.scenario_parser import parse_decision, explain_comparison
+from backend.db import get_profile
 
 router = APIRouter()
 

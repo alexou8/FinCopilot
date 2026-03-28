@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { demoProfile } from '../data/demoProfile';
 import { demoConversation } from '../data/demoConversation';
 import { demoIssues } from '../data/demoIssues';
@@ -25,11 +26,42 @@ export function AppProvider({ children, isDemo = false }) {
   const [activeSimulation, setActiveSimulation] = useState(isDemo ? demoSimulations[0] : null);
 
   // Auth user — populated from Supabase after sign-in; demo object when isDemo=true
-  const DEMO_AUTH_USER = { id: 'demo-user-001', email: 'alex.chen@laurier.ca', name: 'Alex Chen' };
+  const DEMO_AUTH_USER = { id: 'demo_user', email: 'demo@fincopilot.app', name: 'Demo User' };
   const [authUser, setAuthUser]       = useState(isDemo ? DEMO_AUTH_USER : null);
 
-  // UI state — start on simulations in demo so the flagship feature is immediately visible
+  // UI state
   const [activeNav, setActiveNav]     = useState(isDemo ? 'simulations' : 'chat');
+
+  // Subscribe to Supabase auth state (no-op in demo mode or when Supabase is not configured)
+  useEffect(() => {
+    if (isDemo || !supabase) return;
+
+    // Check current session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setAuthUser({
+          id:    session.user.id,
+          email: session.user.email,
+          name:  session.user.user_metadata?.name ?? session.user.email,
+        });
+      }
+    });
+
+    // Listen to future auth changes (sign-in, sign-out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAuthUser({
+          id:    session.user.id,
+          email: session.user.email,
+          name:  session.user.user_metadata?.name ?? session.user.email,
+        });
+      } else {
+        setAuthUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [isDemo]);
 
   const addMessage = useCallback((msg) => {
     setMessages(prev => [...prev, msg]);
@@ -69,8 +101,7 @@ export function AppProvider({ children, isDemo = false }) {
       // UI
       activeNav, setActiveNav,
 
-      // Legacy compatibility (some hooks still reference these)
-      // TODO: remove once all consumers are migrated
+      // Legacy compatibility
       activePanel: 'simulations',
       setActivePanel: () => {},
       scenario: activeSimulation,

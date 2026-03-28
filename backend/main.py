@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, issues, profiles, scenarios
+from backend.routers import chat, issues, profiles, scenarios
+from backend.routers import simulations
 
 app = FastAPI(title="FinCopilot API", version="0.1.0")
 
@@ -17,6 +18,7 @@ app.include_router(chat.router)
 app.include_router(issues.router)
 app.include_router(profiles.router)
 app.include_router(scenarios.router)
+app.include_router(simulations.router)
 
 
 @app.get("/health")

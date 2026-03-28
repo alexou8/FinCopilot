@@ -1,7 +1,7 @@
 import logging
-from app.config import SUPABASE_URL, SUPABASE_KEY
-from app.models.schemas import ComparisonProfile, FinancialProfile
-from app.services.profile_translation import comparison_to_legacy, legacy_to_comparison
+from backend.config import SUPABASE_URL, SUPABASE_KEY
+from backend.models.schemas import ComparisonProfile, FinancialProfile
+from backend.services.profile_translation import comparison_to_legacy, legacy_to_comparison
 
 logger = logging.getLogger(__name__)
 
@@ -81,3 +81,61 @@ async def upsert_profile(user_id: str, data: dict) -> None:
             "profile_data_before": comparison.model_dump(),
         }
     ).execute()
+
+
+async def get_profile_raw(user_id: str) -> dict | None:
+    """Return the raw profile_data_before dict for a user (ComparisonProfile shape)."""
+    if _use_memory:
+        return _profiles.get(user_id)
+    response = (
+        supabase.table("financial_profiles")
+        .select("profile_data_before")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if response.data:
+        return response.data[0].get("profile_data_before")
+    return None
+
+
+# ── Simulations ───────────────────────────────────────────────────────
+
+_simulations: list[dict] = []
+
+
+async def get_simulations(user_id: str) -> list[dict]:
+    """Fetch all simulations for a user, newest first."""
+    if _use_memory:
+        return [s for s in _simulations if s.get("user_id") == user_id]
+    response = (
+        supabase.table("simulations")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return response.data or []
+
+
+async def save_simulation(data: dict) -> dict:
+    """Insert a simulation row; returns the inserted row with its generated id."""
+    if _use_memory:
+        new_id = len(_simulations) + 1
+        row = {"id": new_id, **data}
+        _simulations.append(row)
+        return row
+    response = (
+        supabase.table("simulations")
+        .insert(data)
+        .execute()
+    )
+    return response.data[0] if response.data else data
+
+
+async def delete_simulation(simulation_id: int) -> None:
+    """Delete a simulation by id."""
+    if _use_memory:
+        global _simulations
+        _simulations = [s for s in _simulations if s.get("id") != simulation_id]
+        return
+    supabase.table("simulations").delete().eq("id", simulation_id).execute()

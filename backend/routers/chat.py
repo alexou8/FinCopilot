@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import ChatRequest, ChatResponse, FinancialProfile
-from app.services.llm import chat_completion
-from app.services.extraction import extract_and_save_profile
-from app.prompts.onboarding import ONBOARDING_SYSTEM_PROMPT
-from app.db import get_conversation_history, save_message
+from backend.models.schemas import ChatRequest, ChatResponse, FinancialProfile
+from backend.services.llm import chat_completion
+from backend.services.extraction import extract_and_save_profile
+from backend.prompts.onboarding import ONBOARDING_SYSTEM_PROMPT
+from backend.db import get_conversation_history, save_message
 
 router = APIRouter()
 
