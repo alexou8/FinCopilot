@@ -69,17 +69,30 @@ async def get_profile(user_id: str) -> dict | None:
 
 
 async def upsert_profile(user_id: str, data: dict) -> None:
-    """Create or update a user's profile using the comparison-profile storage shape."""
+    """Create a profile row if missing, otherwise update the existing row."""
     if _use_memory:
         _profiles[user_id] = data
         return
     legacy_profile = FinancialProfile(**data)
     comparison = legacy_to_comparison(legacy_profile)
-    supabase.table("financial_profiles").upsert(
-        {
-            "user_id": user_id,
-            "profile_data_before": comparison.model_dump(),
-        }
+    payload = {"profile_data_before": comparison.model_dump()}
+    existing = (
+        supabase.table("financial_profiles")
+        .select("id")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        (
+            supabase.table("financial_profiles")
+            .update(payload)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return
+    supabase.table("financial_profiles").insert(
+        {"user_id": user_id, **payload}
     ).execute()
 
 
@@ -96,6 +109,50 @@ async def get_profile_raw(user_id: str) -> dict | None:
     if response.data:
         return response.data[0].get("profile_data_before")
     return None
+
+
+async def get_comparison_profile(
+    user_id: str, target_profile: str = "before"
+) -> dict | None:
+    """Return the raw comparison profile for the requested before/after slot."""
+    column = "profile_data_after" if target_profile == "after" else "profile_data_before"
+    if _use_memory:
+        stored = _profiles.get(user_id)
+        if not stored:
+            return None
+        return stored.get(column)
+    response = (
+        supabase.table("financial_profiles")
+        .select(column)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if response.data:
+        return response.data[0].get(column)
+    return None
+
+
+async def save_comparison_profile(
+    user_id: str, profile_data: dict, target_profile: str = "before"
+) -> None:
+    """Create a row if missing, otherwise update the chosen before/after profile slot."""
+    column = "profile_data_after" if target_profile == "after" else "profile_data_before"
+    if _use_memory:
+        _profiles.setdefault(user_id, {})[column] = profile_data
+        return
+    payload = {column: profile_data}
+    existing = (
+        supabase.table("financial_profiles")
+        .select("id")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        supabase.table("financial_profiles").update(payload).eq("user_id", user_id).execute()
+        return
+    supabase.table("financial_profiles").insert({"user_id": user_id, **payload}).execute()
 
 
 # ── Simulations ───────────────────────────────────────────────────────

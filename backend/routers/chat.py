@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from backend.models.schemas import ChatRequest, ChatResponse, FinancialProfile
+from backend.models.schemas import ChatRequest, ChatResponse, ComparisonProfile
 from backend.services.llm import chat_completion
 from backend.services.extraction import extract_and_save_profile
 from backend.prompts.onboarding import ONBOARDING_SYSTEM_PROMPT
@@ -40,8 +40,10 @@ async def chat(req: ChatRequest):
         {"role": "user", "content": req.message},
         {"role": "assistant", "content": reply},
     ]
-    profile_data = await extract_and_save_profile(req.user_id, full_conversation)
+    profile_data = await extract_and_save_profile(
+        req.user_id, full_conversation, req.profile_target
+    )
 
     # 6. Return reply + freshly extracted profile
-    profile = FinancialProfile(**profile_data) if profile_data else None
+    profile = ComparisonProfile(**profile_data) if profile_data else None
     return ChatResponse(reply=reply, profile=profile)
