@@ -92,6 +92,13 @@ class DashboardSummary(BaseModel):
     account_total: float
 
 
+class ComparisonDecision(BaseModel):
+    description: str | None = None
+    target_amount: float | None = None
+    deadline_months: int | None = None
+    new_recurring_costs: list[RecurringExpenseItem] | None = None
+
+
 class ComparisonProfile(BaseModel):
     profile_label: str | None = None
     scenario_name: str | None = None
@@ -101,6 +108,7 @@ class ComparisonProfile(BaseModel):
     outliers: list[OutlierItem] | None = None
     accounts: list[AccountItem] | None = None
     dashboard_summary: DashboardSummary | None = None
+    decision: ComparisonDecision | None = None
 
 
 # ── Chat ─────────────────────────────────────────────────────────────

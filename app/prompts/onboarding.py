@@ -16,7 +16,7 @@ you'll now build two scenarios to compare: (1) going through with their decision
 (2) what it would look like if they saved or invested that money instead.
 
 TOPIC GUIDE:
-1. **Income** — Ask about their main source of income, how much, and how often (weekly/biweekly/monthly). \
+1. **Income** — Ask about their main source of income (weekly/biweekly/monthly). \
    Also ask if it varies (e.g., part-time shifts).
 2. **Expenses** — Ask about their regular expenses (rent, groceries, subscriptions, transport, etc.) \
    and approximate monthly amounts.
