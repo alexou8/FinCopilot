@@ -50,6 +50,59 @@ class FinancialProfile(BaseModel):
     decision: Decision | None = None
 
 
+class IncomeSourceItem(BaseModel):
+    name: str
+    type: str
+    amount: float
+    frequency: str = "monthly"
+
+
+class DebtItem(BaseModel):
+    name: str
+    balance: float
+    months_remaining: int | None = None
+    interest_rate: float | None = None
+    minimum_payment: float | None = None
+
+
+class RecurringExpenseItem(BaseModel):
+    name: str
+    amount: float
+    frequency: str = "monthly"
+
+
+class OutlierItem(BaseModel):
+    name: str
+    kind: str
+    amount: float
+    month: str
+
+
+class AccountItem(BaseModel):
+    name: str
+    type: str
+    balance: float
+    interest_rate: float | None = None
+
+
+class DashboardSummary(BaseModel):
+    monthly_income: float
+    monthly_surplus: float
+    debt_total: float
+    account_total: float
+
+
+class ComparisonProfile(BaseModel):
+    profile_label: str | None = None
+    scenario_name: str | None = None
+    income_sources: list[IncomeSourceItem] | None = None
+    debts: list[DebtItem] | None = None
+    recurring_expenses: list[RecurringExpenseItem] | None = None
+    outliers: list[OutlierItem] | None = None
+    accounts: list[AccountItem] | None = None
+    dashboard_summary: DashboardSummary | None = None
+
+
 # ── Chat ─────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
