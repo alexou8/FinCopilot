@@ -26,9 +26,9 @@ export function TopBar() {
     >
       {/* Breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-        <span style={{ fontFamily: 'DM Sans', fontSize: '13px', color: 'var(--ink-muted)' }}>Home</span>
-        <ChevronRight size={13} style={{ color: 'var(--ink-subtle)' }} />
-        <span style={{ fontFamily: 'Space Mono', fontSize: '12px', fontWeight: 700, color: 'var(--ink)', letterSpacing: '0.04em' }}>
+        <span style={{ fontFamily: "'Inter', 'DM Sans', sans-serif", fontWeight: 400, fontSize: '13px', color: '#94a3b8' }}>Home</span>
+        <ChevronRight size={13} style={{ color: '#cbd5e1' }} />
+        <span style={{ fontFamily: "'Inter', 'DM Sans', sans-serif", fontWeight: 600, fontSize: '13px', color: '#1e293b', letterSpacing: '-0.01em' }}>
           {crumb}
         </span>
       </div>
