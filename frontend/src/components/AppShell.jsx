@@ -79,11 +79,9 @@ function Layout() {
   );
 }
 
-export function AppShell() {
-  // TODO: Replace with real Supabase session check.
-  // For now always loads in demo mode so all tabs are pre-populated.
+export function AppShell({ isDemo = false }) {
   return (
-    <AppProvider isDemo={true}>
+    <AppProvider isDemo={isDemo}>
       <Layout />
     </AppProvider>
   );
