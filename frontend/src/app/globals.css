@@ -51,8 +51,11 @@
 
 html, body {
   height: 100%;
-  overflow: hidden;
   background: var(--surface);
+
+  /* Aliases used by CinematicHero GSAP component */
+  --color-foreground: var(--ink);
+  --color-background: var(--surface);
 }
 
 body {
