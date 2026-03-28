@@ -1,14 +1,8 @@
 'use client';
 
-import {
-  MessageSquare,
-  AlertTriangle,
-  TrendingUp,
-  User,
-  HelpCircle,
-  Sparkles,
-} from 'lucide-react';
+import { MessageSquare, AlertTriangle, TrendingUp, User, HelpCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { FinCopilotLogo } from '../shared/FinCopilotLogo';
 
 const NAV_ITEMS = [
   { id: 'chat',     icon: MessageSquare, label: 'Chat'      },
@@ -46,21 +40,8 @@ export function NavSidebar() {
     >
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px', paddingLeft: '6px' }}>
-        <div style={{
-          width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(145deg, var(--primary-light), var(--primary-dark))',
-          boxShadow: '4px 4px 8px rgba(0,102,102,0.3), -2px -2px 6px rgba(237,241,247,0.55)',
-        }}>
-          <Sparkles size={16} color="#fff" />
-        </div>
-        <span style={{
-          fontFamily: FONT,
-          fontWeight: 700,
-          fontSize: '15px',
-          color: '#1e293b',
-          letterSpacing: '-0.01em',
-        }}>
+        <FinCopilotLogo size={34} />
+        <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: '15px', color: '#1e293b', letterSpacing: '-0.01em' }}>
           FinCopilot
         </span>
       </div>

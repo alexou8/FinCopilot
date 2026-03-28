@@ -3,6 +3,11 @@ import './globals.css';
 export const metadata = {
   title: 'FinCopilot — Your Financial Thinking Partner',
   description: 'Conversational finance copilot for university students',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }) {
