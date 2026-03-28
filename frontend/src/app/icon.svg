@@ -1,0 +1,18 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#009090"/>
+      <stop offset="1" stop-color="#004444"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="40" height="40" rx="10" fill="url(#bg)"/>
+  <!-- F — vertical stroke -->
+  <rect x="9" y="10" width="4" height="21" rx="1.5" fill="white"/>
+  <!-- F — top bar -->
+  <rect x="9" y="10" width="18" height="4" rx="1.5" fill="white"/>
+  <!-- F — middle bar -->
+  <rect x="9" y="18.5" width="13" height="4" rx="1.5" fill="white"/>
+  <!-- Spark / 4-pointed star -->
+  <path d="M30 6L31.4 9.6L35 11L31.4 12.4L30 16L28.6 12.4L25 11L28.6 9.6Z" fill="#7FFFD4" opacity="0.92"/>
+</svg>
