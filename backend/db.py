@@ -1,5 +1,7 @@
 import logging
 from backend.config import SUPABASE_URL, SUPABASE_KEY
+from backend.models.schemas import ComparisonProfile, FinancialProfile
+from backend.services.profile_translation import comparison_to_legacy, legacy_to_comparison
 
 logger = logging.getLogger(__name__)
 
@@ -47,31 +49,35 @@ async def save_message(user_id: str, role: str, content: str) -> None:
 
 
 async def get_profile(user_id: str) -> dict | None:
-    """Fetch the financial profile for a user. Returns None if not found."""
+    """Fetch the legacy financial profile for a user."""
     if _use_memory:
         return _profiles.get(user_id)
     response = (
         supabase.table("financial_profiles")
-        .select("profile_data_after")
+        .select("profile_data_before, profile_data_after")
         .eq("user_id", user_id)
         .execute()
     )
     if response.data:
-        return response.data[0]["profile_data_after"]
+        row = response.data[0]
+        profile_data = row.get("profile_data_before") or row.get("profile_data_after")
+        if not profile_data:
+            return None
+        comparison = ComparisonProfile(**profile_data)
+        return comparison_to_legacy(comparison).model_dump()
     return None
 
 
 async def upsert_profile(user_id: str, data: dict) -> None:
-    """Create or update the financial profile for a user."""
+    """Create or update a user's profile using the comparison-profile storage shape."""
     if _use_memory:
         _profiles[user_id] = data
         return
-    # Read current profile into profile_data_before for history, write new into profile_data_after
-    current = await get_profile(user_id)
+    legacy_profile = FinancialProfile(**data)
+    comparison = legacy_to_comparison(legacy_profile)
     supabase.table("financial_profiles").upsert(
         {
             "user_id": user_id,
-            "profile_data_before": current or data,
-            "profile_data_after": data,
+            "profile_data_before": comparison.model_dump(),
         }
     ).execute()

@@ -29,10 +29,17 @@ class Account(BaseModel):
     interest_rate: float | None = None
 
 
-class Goal(BaseModel):
+class RecurringCost(BaseModel):
+    name: str
+    amount: float
+    frequency: str = "monthly"
+
+
+class Decision(BaseModel):
     description: str | None = None
     target_amount: float | None = None
     deadline_months: int | None = None
+    new_recurring_costs: list[RecurringCost] | None = None
 
 
 class FinancialProfile(BaseModel):
@@ -40,7 +47,68 @@ class FinancialProfile(BaseModel):
     expenses: list[Expense] | None = None
     debt: list[Debt] | None = None
     accounts: list[Account] | None = None
-    goal: Goal | None = None
+    decision: Decision | None = None
+
+
+class IncomeSourceItem(BaseModel):
+    name: str
+    type: str
+    amount: float
+    frequency: str = "monthly"
+
+
+class DebtItem(BaseModel):
+    name: str
+    balance: float
+    months_remaining: int | None = None
+    interest_rate: float | None = None
+    minimum_payment: float | None = None
+
+
+class RecurringExpenseItem(BaseModel):
+    name: str
+    amount: float
+    frequency: str = "monthly"
+
+
+class OutlierItem(BaseModel):
+    name: str
+    kind: str
+    amount: float
+    month: str
+
+
+class AccountItem(BaseModel):
+    name: str
+    type: str
+    balance: float
+    interest_rate: float | None = None
+
+
+class DashboardSummary(BaseModel):
+    monthly_income: float
+    monthly_surplus: float
+    debt_total: float
+    account_total: float
+
+
+class ComparisonDecision(BaseModel):
+    description: str | None = None
+    target_amount: float | None = None
+    deadline_months: int | None = None
+    new_recurring_costs: list[RecurringExpenseItem] | None = None
+
+
+class ComparisonProfile(BaseModel):
+    profile_label: str | None = None
+    scenario_name: str | None = None
+    income_sources: list[IncomeSourceItem] | None = None
+    debts: list[DebtItem] | None = None
+    recurring_expenses: list[RecurringExpenseItem] | None = None
+    outliers: list[OutlierItem] | None = None
+    accounts: list[AccountItem] | None = None
+    dashboard_summary: DashboardSummary | None = None
+    decision: ComparisonDecision | None = None
 
 
 # ── Chat ─────────────────────────────────────────────────────────────
@@ -73,38 +141,35 @@ class IssueDetectResponse(BaseModel):
 
 # ── Scenarios ────────────────────────────────────────────────────────
 
-class ScenarioParseRequest(BaseModel):
+class ScenarioCompareRequest(BaseModel):
     user_id: str
-    question: str
 
 
-class ExpenseChange(BaseModel):
-    name: str
-    new_amount: float
-
-
-class NewExpense(BaseModel):
+class MonthlyExpense(BaseModel):
     name: str
     amount: float
-    frequency: str = "monthly"
 
 
-class GoalOverride(BaseModel):
-    target_amount: float | None = None
-    deadline_months: int | None = None
+class PathA(BaseModel):
+    label: str
+    upfront_cost: float
+    new_monthly_expenses: list[MonthlyExpense] | None = None
+    removed_monthly_expenses: list[MonthlyExpense] | None = None
 
 
-class ScenarioChanges(BaseModel):
-    income_change: float | None = None
-    expense_changes: list[ExpenseChange] | None = None
-    new_expenses: list[NewExpense] | None = None
-    goal_override: GoalOverride | None = None
+class PathB(BaseModel):
+    label: str
+    strategy: str  # "debt_paydown" | "hisa" | "index_fund"
+    monthly_contribution: float
+    expected_annual_return: float | None = None
+    rationale: str
 
 
-class ScenarioParseResponse(BaseModel):
-    scenario_type: str
-    parsed_changes: ScenarioChanges
-    comparison_label: str
+class ScenarioCompareResponse(BaseModel):
+    decision_summary: str
+    timeline_months: int
+    path_a: PathA
+    path_b: PathB
 
 
 class MonthSnapshot(BaseModel):
@@ -116,12 +181,14 @@ class MonthSnapshot(BaseModel):
 
 class ScenarioExplainRequest(BaseModel):
     user_id: str
-    current: list[MonthSnapshot]
-    modified: list[MonthSnapshot]
+    path_a_trajectory: list[MonthSnapshot]
+    path_b_trajectory: list[MonthSnapshot]
 
 
 class ScenarioExplainResponse(BaseModel):
     verdict: str
-    feasible: bool
+    path_a_feasible: bool
+    path_b_advantage: str
+    path_a_advantage: str
     risk: str
-    insight: str
+    recommendation: str

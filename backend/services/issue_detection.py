@@ -82,14 +82,14 @@ def detect_issues(profile: FinancialProfile) -> list[dict]:
 
     # Rule 5: Goal timeline unrealistic
     if (
-        profile.goal
-        and profile.goal.target_amount is not None
-        and profile.goal.deadline_months is not None
-        and profile.goal.deadline_months > 0
+        profile.decision
+        and profile.decision.target_amount is not None
+        and profile.decision.deadline_months is not None
+        and profile.decision.deadline_months > 0
         and monthly_surplus > 0
     ):
-        months_needed = (profile.goal.target_amount - total_savings) / monthly_surplus
-        if months_needed > profile.goal.deadline_months:
+        months_needed = (profile.decision.target_amount - total_savings) / monthly_surplus
+        if months_needed > profile.decision.deadline_months:
             issues.append({"rule_id": "unrealistic_goal", "severity": "warning"})
 
     return issues
