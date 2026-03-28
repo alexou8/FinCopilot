@@ -14,6 +14,7 @@ export function AppProvider({ children, isDemo = false }) {
   const [scenario, setScenario]         = useState(null);
   const [updatedFields, setUpdatedFields] = useState({});
   const [activePanel, setActivePanel]   = useState('issues');
+  const [activeNav, setActiveNav]       = useState('chat');
   const [isTyping, setIsTyping]         = useState(false);
 
   const addMessage = useCallback((msg) => {
@@ -39,6 +40,7 @@ export function AppProvider({ children, isDemo = false }) {
       scenario, setScenario,
       updatedFields, updateProfileField,
       activePanel, setActivePanel,
+      activeNav, setActiveNav,
       isTyping, setIsTyping,
       isDemo,
     }}>
