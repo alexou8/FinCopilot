@@ -5,13 +5,13 @@
 /* ── CSS Design Tokens ─────────────────────────────────────────────────── */
 :root {
   /* Surface */
-  --surface:       #E0E5EC;
-  --surface-light: #EEF1F6;
-  --surface-dark:  #C8D0DC;
+  --surface:       #DDE2EA;
+  --surface-light: #E8ECF2;
+  --surface-dark:  #C0CAD8;
 
   /* Shadow pigments */
-  --shadow-light:  #ffffff;
-  --shadow-dark:   #a3b1c6;
+  --shadow-light:  #edf1f7;
+  --shadow-dark:   #9aabbe;
 
   /* Brand */
   --primary:       #006666;
@@ -26,16 +26,16 @@
   --ink-muted:     #5a6a85;
   --ink-subtle:    #8496af;
 
-  /* Neumorphic shadows */
-  --shadow-out-sm: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
-  --shadow-out:    9px 9px 18px var(--shadow-dark), -9px -9px 18px var(--shadow-light);
-  --shadow-out-lg: 14px 14px 28px var(--shadow-dark), -14px -14px 28px var(--shadow-light);
-  --shadow-in-sm:  inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-  --shadow-in:     inset 6px 6px 12px var(--shadow-dark), inset -6px -6px 12px var(--shadow-light);
-  --shadow-flat:   2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
+  /* Neumorphic shadows — tighter spread, softer highlight */
+  --shadow-out-sm: 4px 4px 8px var(--shadow-dark),   -3px -3px 7px var(--shadow-light);
+  --shadow-out:    7px 7px 14px var(--shadow-dark),   -5px -5px 12px var(--shadow-light);
+  --shadow-out-lg: 11px 11px 22px var(--shadow-dark), -7px -7px 16px var(--shadow-light);
+  --shadow-in-sm:  inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);
+  --shadow-in:     inset 5px 5px 10px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light);
+  --shadow-flat:   2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light);
 
-  /* Convex gradient on raised surfaces */
-  --gradient-convex: linear-gradient(145deg, var(--surface-light), var(--surface));
+  /* Convex gradient — compressed range to reduce bright bleed */
+  --gradient-convex: linear-gradient(145deg, var(--surface-light), var(--surface-dark));
 
   /* Shape */
   --radius-sm:  12px;
@@ -119,7 +119,7 @@ body {
 
 .neu-btn-primary {
   background: linear-gradient(145deg, var(--primary-light), var(--primary-dark));
-  box-shadow: 5px 5px 10px rgba(0,102,102,0.35), -3px -3px 8px rgba(255,255,255,0.6);
+  box-shadow: 4px 4px 8px rgba(0,102,102,0.35), -3px -3px 7px rgba(237,241,247,0.55);
   color: #fff;
   border: none;
   outline: none;
@@ -127,8 +127,8 @@ body {
   border-radius: var(--radius-sm);
   transition: box-shadow var(--transition), transform var(--transition);
 }
-.neu-btn-primary:hover  { box-shadow: 7px 7px 14px rgba(0,102,102,0.4), -4px -4px 10px rgba(255,255,255,0.65); }
-.neu-btn-primary:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.3); transform: scale(0.97); }
+.neu-btn-primary:hover  { box-shadow: 6px 6px 12px rgba(0,102,102,0.4), -4px -4px 9px rgba(237,241,247,0.6); }
+.neu-btn-primary:active { box-shadow: inset 3px 3px 7px rgba(0,0,0,0.28); transform: scale(0.97); }
 .neu-btn-primary:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 3px; }
 .neu-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
