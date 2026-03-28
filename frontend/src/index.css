@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --surface-dark: #C8D0DC;
+  }
+}
+
+@layer utilities {
+  .text-ink-muted    { color: #5a6a85; }
+  .text-ink-subtle   { color: #8496af; }
+  .border-surface-dark { border-color: #C8D0DC; }
+  .bg-surface        { background-color: #E0E5EC; }
+}
