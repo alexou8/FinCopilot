@@ -1,9 +1,9 @@
 import json
 import logging
 
-from app.services.llm import chat_completion
-from app.prompts.extraction import EXTRACTION_SYSTEM_PROMPT
-from app.db import upsert_profile
+from backend.services.llm import chat_completion
+from backend.prompts.extraction import EXTRACTION_SYSTEM_PROMPT
+from backend.db import upsert_profile
 
 logger = logging.getLogger(__name__)
 

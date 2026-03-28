@@ -1,6 +1,6 @@
 import { demoProfile } from '../data/demoProfile';
 
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_BASE = '/api';
 
 let localProfile = { ...demoProfile };
@@ -10,7 +10,7 @@ export async function getProfile(userId = 'demo-user') {
     await new Promise(r => setTimeout(r, 300));
     return { ...localProfile };
   }
-  const res = await fetch(`${API_BASE}/profile/${userId}`);
+  const res = await fetch(`${API_BASE}/profiles/${userId}`);
   if (!res.ok) throw new Error('Profile fetch failed');
   return res.json();
 }
@@ -20,7 +20,7 @@ export async function updateProfile(userId = 'demo-user', updates) {
     localProfile = { ...localProfile, ...updates };
     return { ...localProfile };
   }
-  const res = await fetch(`${API_BASE}/profile/${userId}`, {
+  const res = await fetch(`${API_BASE}/profiles/${userId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),

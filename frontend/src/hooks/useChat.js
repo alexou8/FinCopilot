@@ -3,16 +3,17 @@
 import { useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { sendMessage } from '../services/chatService';
-import { demoScenario } from '../data/demoScenario';
 
 function generateId() {
   return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export function useChat() {
-  const { addMessage, setIsTyping, updateProfileField, setActivePanel, setScenario } = useApp();
+  const { addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario } = useApp();
 
   const send = useCallback(async (text) => {
+    const userId = authUser?.id ?? 'demo_user';
+
     const userMsg = {
       id: generateId(),
       role: 'user',
@@ -23,7 +24,7 @@ export function useChat() {
     setIsTyping(true);
 
     try {
-      const response = await sendMessage(text);
+      const response = await sendMessage(text, userId);
       const aiMsg = {
         id: generateId(),
         role: 'assistant',
@@ -33,15 +34,11 @@ export function useChat() {
       };
       addMessage(aiMsg);
 
-      if (response.profileUpdates) {
+      if (response.profileUpdates && Object.keys(response.profileUpdates).length > 0) {
+        setProfile(prev => ({ ...(prev || {}), ...response.profileUpdates }));
         Object.keys(response.profileUpdates).forEach(field => {
           updateProfileField(field);
         });
-      }
-
-      if (response.type === 'scenario') {
-        setScenario(demoScenario);
-        setActivePanel('scenario');
       }
     } catch (err) {
       addMessage({
@@ -54,7 +51,7 @@ export function useChat() {
     } finally {
       setIsTyping(false);
     }
-  }, [addMessage, setIsTyping, updateProfileField, setActivePanel, setScenario]);
+  }, [addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario]);
 
   return { send };
 }

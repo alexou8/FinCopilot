@@ -1,84 +1,107 @@
-// Simulation service — runs a financial simulation and fetches simulation history.
-// Backed by Supabase (simulations table) once credentials are configured.
-// Set USE_MOCK = false to use real backend API + Supabase storage.
+// Simulation service — runs financial simulations and fetches history.
+// Backed by the FastAPI backend which writes to the Supabase simulations table.
 
-import { supabase } from '../lib/supabase';
-import { demoSimulations } from '../data/demoSimulations';
-
-const USE_MOCK = !supabase;
 const API_BASE = '/api';
 
 /**
+ * Map a raw SimulationRecord from the backend into the shape expected by the
+ * frontend components (SimulationResultView, SimulationHistoryCard, ComparisonChart).
+ */
+function apiToFrontend(sim) {
+  const before = sim.monthly_net_worth_before || [];
+  const after  = sim.monthly_net_worth_after  || [];
+  const rec    = sim.recommendation || {};
+  const sb     = sim.summary_before || {};
+  const sa     = sim.summary_after  || {};
+
+  const trajectories = before.map((b, i) => ({
+    month:    b.month,
+    current:  b.value,
+    scenario: after[i]?.value ?? b.value,
+  }));
+
+  return {
+    id:        sim.id,
+    prompt:    sim.scenario_name,
+    createdAt: sim.created_at,
+    status:    'completed',
+    scenarios: {
+      baseline:    { label: 'Current path' },
+      alternative: { label: sim.scenario_name },
+    },
+    verdict: {
+      feasible:        rec.feasible ?? (sa.monthly_surplus >= 0),
+      headline:        rec.headline  ?? 'Simulation complete',
+      summary:         rec.body      ?? '',
+      recommendations: rec.recommendations ?? [],
+    },
+    metrics: {
+      current: {
+        monthlySavings:      sb.monthly_surplus   ?? 0,
+        monthsToGoal:        null,
+        emergencyFundMonths: null,
+        monthlyInterestPaid: 0,
+      },
+      scenario: {
+        monthlySavings:      sa.monthly_surplus   ?? 0,
+        monthsToGoal:        null,
+        emergencyFundMonths: null,
+        monthlyInterestPaid: 0,
+      },
+    },
+    trajectories,
+    // Keep raw fields for debugging / profile pane
+    _raw: sim,
+  };
+}
+
+/**
  * Run a new simulation.
- * Backend uses AI to parse the prompt and determine what to model
- * (e.g. "move out" → adds rent expense, removes current housing savings).
- * Result is stored in Supabase: simulations table.
+ * Backend: builds profile_after from prompt via AI, computes 12-month net worth
+ * trajectories, generates a recommendation, and stores everything in Supabase.
  *
- * @param {{ prompt: string, profileBefore: object, profileAfter?: object }} params
+ * @param {{ prompt: string, profileBefore?: object }} params
  * @param {string} userId
  */
-export async function runSimulation(params, userId = 'demo-user') {
-  if (USE_MOCK) {
-    await delay(1800 + Math.random() * 800);
-    // Return the first demo simulation as a template with the user's prompt
-    const result = {
-      ...demoSimulations[0],
-      id: `sim-${Date.now()}`,
-      prompt: params.prompt,
-      title: params.prompt,
-      createdAt: new Date().toISOString(),
-    };
-    return result;
-  }
-
-  // TODO: POST to backend simulation endpoint
-  // Backend will:
-  //   1. Use Claude/OpenAI to understand the prompt and build profileAfter
-  //   2. Run deterministic financial projections for both profiles
-  //   3. Store result in Supabase: simulations table
-  //   4. Return the full simulation result
-  const res = await fetch(`${API_BASE}/simulate`, {
+export async function runSimulation(params, userId = 'demo_user') {
+  const res = await fetch(`${API_BASE}/simulations/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...params, userId }),
+    body: JSON.stringify({
+      user_id:       userId,
+      scenario_name: params.prompt,
+      prompt:        params.prompt,
+    }),
   });
-  if (!res.ok) throw new Error('Simulation failed');
-  return res.json();
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Simulation failed');
+  }
+  const sim = await res.json();
+  return apiToFrontend(sim);
 }
 
 /**
  * Fetch simulation history for a user.
- * TODO: Replace fetch with Supabase query once auth is set up:
- *   supabase.from('simulations').select().eq('user_id', userId).order('created_at', { ascending: false })
+ *
+ * @param {string} userId
  */
-export async function getSimulations(userId = 'demo-user') {
-  if (USE_MOCK) {
-    await delay(300);
-    return [...demoSimulations];
-  }
-  const res = await fetch(`${API_BASE}/simulations?userId=${encodeURIComponent(userId)}`);
+export async function getSimulations(userId = 'demo_user') {
+  const res = await fetch(`${API_BASE}/simulations/${encodeURIComponent(userId)}`);
   if (!res.ok) throw new Error('Failed to fetch simulations');
-  return res.json();
+  const sims = await res.json();
+  return sims.map(apiToFrontend);
 }
 
 /**
  * Delete a simulation by ID.
- * TODO: supabase.from('simulations').delete().eq('id', id).eq('user_id', userId)
+ *
+ * @param {number|string} id
  */
-export async function deleteSimulation(id, userId = 'demo-user') {
-  if (USE_MOCK) {
-    await delay(300);
-    return { error: null };
-  }
+export async function deleteSimulation(id) {
   const res = await fetch(`${API_BASE}/simulations/${id}`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId }),
   });
   if (!res.ok) throw new Error('Failed to delete simulation');
   return res.json();
-}
-
-function delay(ms) {
-  return new Promise(r => setTimeout(r, ms));
 }

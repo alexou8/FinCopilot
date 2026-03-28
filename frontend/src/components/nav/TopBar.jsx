@@ -1,7 +1,9 @@
 'use client';
 
-import { Bell, ChevronRight } from 'lucide-react';
+import { Bell, ChevronRight, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
+import { signOut } from '../../services/authService';
 
 const PAGE_LABELS = {
   chat:        'Chat',
@@ -11,8 +13,14 @@ const PAGE_LABELS = {
 };
 
 export function TopBar() {
-  const { activeNav } = useApp();
+  const { activeNav, authUser, isDemo } = useApp();
+  const router = useRouter();
   const crumb = PAGE_LABELS[activeNav] || 'Chat';
+
+  async function handleSignOut() {
+    await signOut();
+    router.push('/login');
+  }
 
   return (
     <div
@@ -33,22 +41,49 @@ export function TopBar() {
         </span>
       </div>
 
+      {/* User email badge (non-demo) */}
+      {!isDemo && authUser?.email && (
+        <span style={{
+          fontFamily: 'DM Sans, sans-serif', fontSize: '12px',
+          color: 'var(--ink-muted)', maxWidth: '160px',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {authUser.email}
+        </span>
+      )}
+
       {/* Notification bell */}
       <button
         className="neu-raised-sm"
         style={{
-          width: '38px', height: '38px',
-          borderRadius: '12px',
+          width: '38px', height: '38px', borderRadius: '12px',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--ink-muted)',
-          background: 'var(--gradient-convex)',
+          color: 'var(--ink-muted)', background: 'var(--gradient-convex)',
           transition: 'all 0.18s',
         }}
         title="Notifications"
       >
         <Bell size={16} />
       </button>
+
+      {/* Sign out (hidden in demo mode) */}
+      {!isDemo && (
+        <button
+          onClick={handleSignOut}
+          className="neu-raised-sm"
+          style={{
+            width: '38px', height: '38px', borderRadius: '12px',
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--ink-muted)', background: 'var(--gradient-convex)',
+            transition: 'all 0.18s',
+          }}
+          title="Sign out"
+        >
+          <LogOut size={16} />
+        </button>
+      )}
     </div>
   );
 }

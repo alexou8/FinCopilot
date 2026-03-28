@@ -1,6 +1,6 @@
-from app.db import get_profile, upsert_profile
-from app.models.schemas import ComparisonProfile, FinancialProfile
-from app.services.profile_translation import comparison_to_legacy, legacy_to_comparison
+from backend.db import get_profile, upsert_profile
+from backend.models.schemas import ComparisonProfile, FinancialProfile
+from backend.services.profile_translation import comparison_to_legacy, legacy_to_comparison
 
 
 async def get_profile_by_user_id(user_id: str) -> FinancialProfile | None:

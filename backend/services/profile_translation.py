@@ -1,4 +1,4 @@
-from app.models.schemas import (
+from backend.models.schemas import (
     Account,
     AccountItem,
     ComparisonDecision,

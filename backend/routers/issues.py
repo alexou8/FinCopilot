@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import IssueDetectRequest, IssueDetectResponse, FinancialProfile
-from app.services.issue_detection import detect_issues, explain_issues
-from app.db import get_profile
+from backend.models.schemas import IssueDetectRequest, IssueDetectResponse, FinancialProfile
+from backend.services.issue_detection import detect_issues, explain_issues
+from backend.db import get_profile
 
 router = APIRouter()
 

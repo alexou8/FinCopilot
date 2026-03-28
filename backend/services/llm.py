@@ -1,6 +1,6 @@
 import logging
 from openai import AsyncOpenAI
-from app.config import OPENAI_API_KEY
+from backend.config import OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 
