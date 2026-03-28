@@ -1,0 +1,24 @@
+from fastapi import APIRouter, HTTPException
+
+from app.models.schemas import FinancialProfile
+from app.services.profile_repository import (
+    get_profile_by_user_id,
+    upsert_profile_by_user_id,
+)
+
+router = APIRouter()
+
+
+@router.get("/profiles/{user_id}", response_model=FinancialProfile)
+async def get_profile_route(user_id: str):
+    """Return the saved financial profile for a user."""
+    profile = await get_profile_by_user_id(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Financial profile not found")
+    return profile
+
+
+@router.put("/profiles/{user_id}", response_model=FinancialProfile)
+async def upsert_profile_route(user_id: str, profile: FinancialProfile):
+    """Create or replace the saved financial profile for a user."""
+    return await upsert_profile_by_user_id(user_id, profile)
