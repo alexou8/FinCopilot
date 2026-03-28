@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Literal
 from pydantic import BaseModel
 
 
@@ -116,11 +117,12 @@ class ComparisonProfile(BaseModel):
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    profile_target: Literal["before", "after"] = "before"
 
 
 class ChatResponse(BaseModel):
     reply: str
-    profile: FinancialProfile | None = None
+    profile: ComparisonProfile | None = None
 
 
 # ── Issues ───────────────────────────────────────────────────────────
