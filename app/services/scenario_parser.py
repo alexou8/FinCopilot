@@ -5,8 +5,9 @@ from app.services.llm import chat_completion
 from app.prompts.scenario import SCENARIO_PARSE_SYSTEM_PROMPT, SCENARIO_EXPLAIN_SYSTEM_PROMPT
 from app.models.schemas import (
     FinancialProfile,
-    ScenarioChanges,
-    ScenarioParseResponse,
+    PathA,
+    PathB,
+    ScenarioCompareResponse,
     ScenarioExplainResponse,
     MonthSnapshot,
 )
@@ -14,13 +15,10 @@ from app.models.schemas import (
 logger = logging.getLogger(__name__)
 
 
-async def parse_scenario(
-    profile: FinancialProfile, question: str
-) -> ScenarioParseResponse:
-    """Parse a natural-language what-if question into structured changes."""
+async def parse_decision(profile: FinancialProfile) -> ScenarioCompareResponse:
+    """Analyse the user's profile and big decision, returning structured Path A vs Path B."""
     user_message = (
-        f"User's financial profile:\n{profile.model_dump_json(indent=2)}\n\n"
-        f"Question: {question}"
+        f"User's financial profile:\n{profile.model_dump_json(indent=2)}"
     )
 
     messages = [
@@ -31,20 +29,24 @@ async def parse_scenario(
     raw = await chat_completion(messages, temperature=0, json_mode=True)
     data = json.loads(raw)
 
-    return ScenarioParseResponse(
-        scenario_type=data.get("scenario_type", "unknown"),
-        parsed_changes=ScenarioChanges(**(data.get("changes") or {})),
-        comparison_label=data.get("comparison_label", ""),
+    return ScenarioCompareResponse(
+        decision_summary=data.get("decision_summary", ""),
+        timeline_months=data.get("timeline_months", 12),
+        path_a=PathA(**(data.get("path_a") or {})),
+        path_b=PathB(**(data.get("path_b") or {})),
     )
 
 
-async def explain_scenario(
-    current: list[MonthSnapshot], modified: list[MonthSnapshot]
+async def explain_comparison(
+    path_a_trajectory: list[MonthSnapshot],
+    path_b_trajectory: list[MonthSnapshot],
 ) -> ScenarioExplainResponse:
-    """Generate a plain-language comparison of two projected trajectories."""
+    """Generate a plain-language verdict comparing Path A vs Path B simulation results."""
     user_message = (
-        f"Current trajectory:\n{json.dumps([s.model_dump() for s in current], indent=2)}\n\n"
-        f"Modified trajectory:\n{json.dumps([s.model_dump() for s in modified], indent=2)}"
+        f"Path A (Proceed) trajectory:\n"
+        f"{json.dumps([s.model_dump() for s in path_a_trajectory], indent=2)}\n\n"
+        f"Path B (Save & Invest) trajectory:\n"
+        f"{json.dumps([s.model_dump() for s in path_b_trajectory], indent=2)}"
     )
 
     messages = [
@@ -57,7 +59,9 @@ async def explain_scenario(
 
     return ScenarioExplainResponse(
         verdict=data.get("verdict", ""),
-        feasible=data.get("feasible", False),
+        path_a_feasible=data.get("path_a_feasible", False),
+        path_b_advantage=data.get("path_b_advantage", ""),
+        path_a_advantage=data.get("path_a_advantage", ""),
         risk=data.get("risk", ""),
-        insight=data.get("insight", ""),
+        recommendation=data.get("recommendation", ""),
     )

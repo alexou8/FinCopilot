@@ -1,14 +1,17 @@
 from app.models.schemas import (
     Account,
     AccountItem,
+    ComparisonDecision,
     ComparisonProfile,
     DashboardSummary,
+    Decision,
     Debt,
     DebtItem,
     Expense,
     FinancialProfile,
     Income,
     IncomeSourceItem,
+    RecurringCost,
     RecurringExpenseItem,
 )
 
@@ -68,12 +71,24 @@ def comparison_to_legacy(profile: ComparisonProfile) -> FinancialProfile:
             for item in profile.accounts
         ]
 
+    decision = None
+    if profile.decision:
+        decision = Decision(
+            description=profile.decision.description,
+            target_amount=profile.decision.target_amount,
+            deadline_months=profile.decision.deadline_months,
+            new_recurring_costs=[
+                RecurringCost(name=c.name, amount=c.amount, frequency=c.frequency)
+                for c in (profile.decision.new_recurring_costs or [])
+            ] or None,
+        )
+
     return FinancialProfile(
         income=income,
         expenses=expenses,
         debt=debt,
         accounts=accounts,
-        goal=None,
+        decision=decision,
     )
 
 
@@ -140,6 +155,18 @@ def legacy_to_comparison(
     debt_total = sum(item.balance for item in (profile.debt or []))
     account_total = sum(item.balance for item in (profile.accounts or []))
 
+    decision = None
+    if profile.decision:
+        decision = ComparisonDecision(
+            description=profile.decision.description,
+            target_amount=profile.decision.target_amount,
+            deadline_months=profile.decision.deadline_months,
+            new_recurring_costs=[
+                RecurringExpenseItem(name=c.name, amount=c.amount, frequency=c.frequency)
+                for c in (profile.decision.new_recurring_costs or [])
+            ] or None,
+        )
+
     return ComparisonProfile(
         profile_label=profile_label,
         scenario_name=scenario_name,
@@ -154,4 +181,5 @@ def legacy_to_comparison(
             debt_total=round(debt_total, 2),
             account_total=round(account_total, 2),
         ),
+        decision=decision,
     )
