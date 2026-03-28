@@ -1,28 +1,26 @@
 'use client';
 
-import { MessageSquare, AlertTriangle, TrendingUp, User, HelpCircle } from 'lucide-react';
+import { MessageSquare, AlertTriangle, BarChart2, User, HelpCircle, LogOut } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { FinCopilotLogo } from '../shared/FinCopilotLogo';
 
 const NAV_ITEMS = [
-  { id: 'chat',     icon: MessageSquare, label: 'Chat'      },
-  { id: 'issues',   icon: AlertTriangle, label: 'Issues'    },
-  { id: 'scenario', icon: TrendingUp,    label: 'Scenarios' },
-  { id: 'profile',  icon: User,          label: 'Profile'   },
+  { id: 'chat',        icon: MessageSquare, label: 'Chat'        },
+  { id: 'issues',      icon: AlertTriangle,  label: 'Issues'      },
+  { id: 'simulations', icon: BarChart2,      label: 'Simulations' },
+  { id: 'profile',     icon: User,           label: 'Profile'     },
 ];
 
 const FONT = "'Inter', 'DM Sans', sans-serif";
 
 export function NavSidebar() {
-  const { activeNav, setActiveNav, setActivePanel, profile } = useApp();
-  const fullName = profile?.name || 'Alex Chen';
-  const role     = profile?.university
-    ? profile.university.split(' ').slice(-1)[0] + ' Student'
-    : 'Student';
+  const { activeNav, setActiveNav, profile, authUser } = useApp();
+
+  const fullName = authUser?.name || profile?.name || 'Guest';
+  const email    = authUser?.email || 'Demo mode';
 
   function handleNav(id) {
     setActiveNav(id);
-    if (id === 'issues' || id === 'scenario') setActivePanel(id);
   }
 
   return (
@@ -153,7 +151,7 @@ export function NavSidebar() {
         }}>
           {fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
         </div>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <p style={{
             fontFamily: FONT, fontWeight: 500, fontSize: '13px',
             color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -161,10 +159,21 @@ export function NavSidebar() {
           }}>
             {fullName}
           </p>
-          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: '11px', color: '#94a3b8', letterSpacing: '0' }}>
-            {role}
+          <p style={{
+            fontFamily: FONT, fontWeight: 400, fontSize: '10px', color: '#94a3b8',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {email}
           </p>
         </div>
+        <button
+          title="Sign out"
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px', flexShrink: 0 }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; }}
+        >
+          <LogOut size={13} />
+        </button>
       </div>
     </div>
   );

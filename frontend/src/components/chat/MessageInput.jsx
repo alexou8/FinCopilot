@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { NeuInput } from '../shared/NeuInput';
 
-export function MessageInput({ onSend, disabled }) {
+export function MessageInput({ onSend, disabled, placeholder = 'Ask about your finances…' }) {
   const [value, setValue] = useState('');
   const inputRef = useRef(null);
 
@@ -29,7 +29,7 @@ export function MessageInput({ onSend, disabled }) {
           ref={inputRef}
           multiline
           rows={2}
-          placeholder="Ask about your finances…"
+          placeholder={placeholder}
           value={value}
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

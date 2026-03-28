@@ -4,17 +4,22 @@ import { AppProvider, useApp } from '../context/AppContext';
 import { ChatPanel } from './chat/ChatPanel';
 import { ProfileSidebar } from './profile/ProfileSidebar';
 import { IssuesPanel } from './issues/IssuesPanel';
-import { ScenarioPanel } from './scenarios/ScenarioPanel';
+import { SimulationsPanel } from './simulations/SimulationsPanel';
 import { NavSidebar } from './nav/NavSidebar';
 import { TopBar } from './nav/TopBar';
 
 function Layout() {
-  const { activePanel, activeNav } = useApp();
+  const { activeNav } = useApp();
 
-  // Determine which panels to show based on active nav
-  const showChat    = true; // chat always visible
-  const showCenter  = activeNav === 'issues' || activeNav === 'scenario';
-  const showProfile = activeNav === 'profile' || activeNav === 'issues' || activeNav === 'scenario';
+  // Each tab maps to a distinct layout:
+  //  chat        → chat panel only (full width)
+  //  issues      → chat (left) + issues panel (right)
+  //  simulations → full-width SimulationsPanel (history + results side-by-side)
+  //  profile     → full-width ProfileSidebar
+  const showChat        = activeNav === 'chat' || activeNav === 'issues';
+  const showIssues      = activeNav === 'issues';
+  const showSimulations = activeNav === 'simulations';
+  const showProfile     = activeNav === 'profile';
 
   return (
     <div
@@ -31,7 +36,7 @@ function Layout() {
       {/* Far-left: Nav Sidebar */}
       <NavSidebar />
 
-      {/* Main content area (everything to the right of sidebar) */}
+      {/* Main content area */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         {/* Top bar */}
         <TopBar />
@@ -39,52 +44,46 @@ function Layout() {
         {/* Panels row */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: '16px' }}>
 
-          {/* Chat */}
-          <div style={{
-            flex: showCenter ? '2 1 0' : showProfile ? '2 1 0' : '3 1 0',
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-          }}>
-            <ChatPanel />
-          </div>
+          {/* Chat + Issues view */}
+          {showChat && (
+            <div style={{ flex: showIssues ? '1.4 1 0' : '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <ChatPanel />
+            </div>
+          )}
 
-          {/* Center: Issues / Scenario */}
-          {showCenter && (
-            <div style={{ flex: '1.5 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {showIssues && (
+            <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div className="neu-raised-lg" style={{ flex: 1, overflow: 'hidden' }}>
-                {activePanel === 'issues' ? <IssuesPanel /> : <ScenarioPanel />}
+                <IssuesPanel />
               </div>
             </div>
           )}
 
-          {/* Right: Profile */}
+          {/* Simulations: full-width split-pane */}
+          {showSimulations && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <SimulationsPanel />
+            </div>
+          )}
+
+          {/* Profile: full-width editable view */}
           {showProfile && (
-            <div style={{
-              flex: activeNav === 'profile' ? '2 1 0' : '1.5 1 0',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-            }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <ProfileSidebar />
             </div>
           )}
+
         </div>
       </div>
     </div>
   );
 }
 
-function getDemoMode() {
-  if (typeof window === 'undefined') return false;
-  return new URLSearchParams(window.location.search).get('demo') === 'true';
-}
-
 export function AppShell() {
+  // TODO: Replace with real Supabase session check.
+  // For now always loads in demo mode so all tabs are pre-populated.
   return (
-    <AppProvider isDemo={getDemoMode()}>
+    <AppProvider isDemo={true}>
       <Layout />
     </AppProvider>
   );
