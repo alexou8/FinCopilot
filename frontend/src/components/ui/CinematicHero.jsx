@@ -35,11 +35,12 @@ const INJECTED_STYLES = `
   }
 
   .text-silver-matte {
-    background: linear-gradient(180deg, var(--color-foreground) 0%, color-mix(in srgb, var(--color-foreground) 40%, transparent) 100%);
+    background: linear-gradient(180deg, var(--color-foreground) 0%, var(--color-foreground) 72%, color-mix(in srgb, var(--color-foreground) 45%, transparent) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     transform: translateZ(0);
+    padding-bottom: 0.15em;
     filter:
       drop-shadow(0px 10px 20px color-mix(in srgb, var(--color-foreground) 15%, transparent))
       drop-shadow(0px 2px 4px color-mix(in srgb, var(--color-foreground) 10%, transparent));
@@ -71,59 +72,6 @@ const INJECTED_STYLES = `
     position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 50;
     background: radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,128,128,0.07) 0%, transparent 40%);
     mix-blend-mode: screen; transition: opacity 0.3s ease;
-  }
-
-  /* Apple MacBook-style hardware */
-  .laptop-lid {
-    background: linear-gradient(170deg, #2c2c2e 0%, #1d1d1f 55%);
-    border-radius: 14px 14px 3px 3px;
-    padding: 11px 9px 22px;
-    box-shadow:
-      inset 0 0 0 1px rgba(255,255,255,0.07),
-      0 0 0 1px #000,
-      -1px 0 3px rgba(0,0,0,0.6),
-      1px 0 3px rgba(0,0,0,0.6);
-    position: relative;
-  }
-  .laptop-body {
-    background: linear-gradient(180deg, #323234 0%, #1d1d1f 25%, #1a1a1c 100%);
-    border-radius: 2px 2px 16px 16px;
-    box-shadow:
-      0 50px 100px -15px rgba(0,0,0,0.95),
-      0 20px 50px -8px rgba(0,0,0,0.85),
-      inset 0 1px 0 rgba(255,255,255,0.09),
-      inset 0 -1px 0 rgba(0,0,0,0.4);
-  }
-  .laptop-hinge {
-    background: linear-gradient(90deg, #0a0a0a 0%, #3a3a3c 25%, #3a3a3c 75%, #0a0a0a 100%);
-    height: 3px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04);
-  }
-  .laptop-screen-inner {
-    background: #03120e;
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.8);
-  }
-  .laptop-key-fn {
-    background: linear-gradient(180deg, #363638 0%, #2c2c2e 100%);
-    border-radius: 4px;
-    box-shadow: 0 1px 0 #0a0a0a, inset 0 1px 0 rgba(255,255,255,0.06);
-  }
-  .laptop-key-std {
-    background: linear-gradient(180deg, #363638 0%, #2c2c2e 100%);
-    border-radius: 5px;
-    box-shadow: 0 2px 0 #0a0a0a, inset 0 1px 0 rgba(255,255,255,0.07);
-  }
-  .laptop-trackpad {
-    background: linear-gradient(175deg, #2e2e30 0%, #252527 100%);
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.04);
-    box-shadow: inset 0 1px 4px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.03);
-  }
-  .screen-glare {
-    background: linear-gradient(115deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 42%);
   }
 
   .floating-ui-badge {
@@ -340,140 +288,114 @@ export function CinematicHero({
             <div className="mockup-scroll-wrapper order-2 relative w-full h-[340px] lg:h-[520px] flex items-center justify-center z-10" style={{ perspective: '1000px' }}>
               <div className="relative w-full h-full flex items-center justify-center transform scale-[0.62] md:scale-[0.82] lg:scale-100" style={{ transformOrigin: 'center center' }}>
 
-                {/* ── Apple MacBook-style laptop assembly ── */}
-                <div ref={mockupRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', willChange: 'transform', transformStyle: 'preserve-3d' }}>
+                {/* ── MacBook Pro mockup image ── */}
+                {/* img sets container height naturally so overlay % coords stay accurate */}
+                <div
+                  ref={mockupRef}
+                  style={{
+                    position: 'relative',
+                    width: '520px',
+                    flexShrink: 0,
+                    willChange: 'transform',
+                    transformStyle: 'preserve-3d',
+                    filter: 'drop-shadow(0 50px 70px rgba(0,0,0,0.85)) drop-shadow(0 16px 32px rgba(0,0,0,0.65))',
+                  }}
+                >
+                  {/* MacBook frame PNG — in normal flow, sets container height */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/laptop-mockup.png"
+                    alt=""
+                    aria-hidden="true"
+                    draggable={false}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      height: 'auto',
+                      pointerEvents: 'none',
+                      userSelect: 'none',
+                    }}
+                  />
 
-                  {/* Lid */}
-                  <div className="laptop-lid" style={{ width: '488px' }}>
+                  {/* Dashboard UI — sits over the screen area of the MacBook */}
+                  {/* left/top are % of container dimensions (matching image pixel ratios). */}
+                  {/* aspectRatio locks the overlay to MacBook Pro 16" screen proportions (3456:2234). */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '9.95%',
+                    top: '1.03%',
+                    width: '80.13%',
+                    aspectRatio: '3456 / 2234',
+                    overflow: 'hidden',
+                    borderRadius: '5px',
+                    background: '#03120e',
+                    zIndex: 20,
+                    display: 'flex',
+                  }}>
 
-                    {/* Webcam dot — centered in top bezel */}
-                    <div style={{ position: 'absolute', top: '5px', left: '50%', transform: 'translateX(-50%)', width: '5px', height: '5px', borderRadius: '50%', background: '#3a3a3c', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.6)' }} aria-hidden="true" />
+                    {/* Mini nav sidebar */}
+                    <div className="phone-widget" style={{ width: '50px', background: '#041610', padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0, borderRight: '1px solid rgba(0,128,128,0.08)' }}>
+                      <svg width="22" height="22" viewBox="0 0 40 40" fill="none" style={{ marginBottom: '8px', flexShrink: 0 }} aria-hidden="true">
+                        <defs><linearGradient id="mg2" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stopColor="#009090"/><stop offset="1" stopColor="#004444"/></linearGradient></defs>
+                        <rect width="40" height="40" rx="10" fill="url(#mg2)"/>
+                        <rect x="9" y="10" width="4" height="21" rx="1.5" fill="white"/>
+                        <rect x="9" y="10" width="18" height="4" rx="1.5" fill="white"/>
+                        <rect x="9" y="18.5" width="13" height="4" rx="1.5" fill="white"/>
+                        <path d="M30 6L31.4 9.6L35 11L31.4 12.4L30 16L28.6 12.4L25 11L28.6 9.6Z" fill="#7FFFD4" opacity="0.9"/>
+                      </svg>
+                      {[true,false,false,false].map((active,i) => (
+                        <div key={i} style={{ width: '30px', height: '27px', borderRadius: '7px', background: active ? 'rgba(0,128,128,0.2)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: active ? 'rgba(0,200,150,0.7)' : 'rgba(255,255,255,0.12)' }} />
+                        </div>
+                      ))}
+                    </div>
 
-                    {/* Glare */}
-                    <div className="screen-glare" style={{ position: 'absolute', inset: 0, zIndex: 40, pointerEvents: 'none', borderRadius: 'inherit' }} aria-hidden="true" />
-
-                    {/* ── Screen ── */}
-                    <div className="laptop-screen-inner" style={{ height: '284px', display: 'flex', overflow: 'hidden' }}>
-
-                      {/* Mini nav sidebar */}
-                      <div className="phone-widget" style={{ width: '50px', background: '#041610', padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0, borderRight: '1px solid rgba(0,128,128,0.08)' }}>
-                        <svg width="22" height="22" viewBox="0 0 40 40" fill="none" style={{ marginBottom: '8px', flexShrink: 0 }} aria-hidden="true">
-                          <defs><linearGradient id="mg2" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stopColor="#009090"/><stop offset="1" stopColor="#004444"/></linearGradient></defs>
-                          <rect width="40" height="40" rx="10" fill="url(#mg2)"/>
-                          <rect x="9" y="10" width="4" height="21" rx="1.5" fill="white"/>
-                          <rect x="9" y="10" width="18" height="4" rx="1.5" fill="white"/>
-                          <rect x="9" y="18.5" width="13" height="4" rx="1.5" fill="white"/>
-                          <path d="M30 6L31.4 9.6L35 11L31.4 12.4L30 16L28.6 12.4L25 11L28.6 9.6Z" fill="#7FFFD4" opacity="0.9"/>
-                        </svg>
-                        {[true,false,false,false].map((active,i) => (
-                          <div key={i} style={{ width: '30px', height: '27px', borderRadius: '7px', background: active ? 'rgba(0,128,128,0.2)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: active ? 'rgba(0,200,150,0.7)' : 'rgba(255,255,255,0.12)' }} />
+                    {/* Mini chat */}
+                    <div className="phone-widget" style={{ flex: 1, padding: '10px', display: 'flex', flexDirection: 'column', gap: '7px', overflow: 'hidden', borderRight: '1px solid rgba(0,128,128,0.08)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '7px', borderBottom: '1px solid rgba(0,128,128,0.1)', flexShrink: 0 }}>
+                        <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: 'rgba(0,128,128,0.25)' }} />
+                        <div style={{ height: '7px', width: '55px', background: 'rgba(255,255,255,0.15)', borderRadius: '3px' }} />
+                        <div style={{ marginLeft: 'auto', width: '7px', height: '7px', borderRadius: '50%', background: '#34d399' }} />
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'flex-end' }}>
+                        {[[false,'85%',28],[true,'60%',20],[false,'90%',38],[true,'45%',20]].map(([isUser,w,h],i) => (
+                          <div key={i} style={{ display: 'flex', gap: '5px', alignItems: 'flex-end', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+                            {!isUser && <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: 'rgba(0,128,128,0.35)', flexShrink: 0 }} />}
+                            <div style={{ height: `${h}px`, width: w, background: isUser ? 'rgba(0,128,128,0.22)' : 'rgba(255,255,255,0.06)', borderRadius: isUser ? '6px 6px 2px 6px' : '6px 6px 6px 2px' }} />
                           </div>
                         ))}
                       </div>
+                      <div style={{ height: '24px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', border: '1px solid rgba(0,128,128,0.14)', flexShrink: 0 }} />
+                    </div>
 
-                      {/* Mini chat */}
-                      <div className="phone-widget" style={{ flex: 1, padding: '10px', display: 'flex', flexDirection: 'column', gap: '7px', overflow: 'hidden', borderRight: '1px solid rgba(0,128,128,0.08)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '7px', borderBottom: '1px solid rgba(0,128,128,0.1)', flexShrink: 0 }}>
-                          <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: 'rgba(0,128,128,0.25)' }} />
-                          <div style={{ height: '7px', width: '55px', background: 'rgba(255,255,255,0.15)', borderRadius: '3px' }} />
-                          <div style={{ marginLeft: 'auto', width: '7px', height: '7px', borderRadius: '50%', background: '#34d399' }} />
-                        </div>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'flex-end' }}>
-                          {[[false,'85%',28],[true,'60%',20],[false,'90%',38],[true,'45%',20]].map(([isUser,w,h],i) => (
-                            <div key={i} style={{ display: 'flex', gap: '5px', alignItems: 'flex-end', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-                              {!isUser && <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: 'rgba(0,128,128,0.35)', flexShrink: 0 }} />}
-                              <div style={{ height: `${h}px`, width: w, background: isUser ? 'rgba(0,128,128,0.22)' : 'rgba(255,255,255,0.06)', borderRadius: isUser ? '6px 6px 2px 6px' : '6px 6px 6px 2px' }} />
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ height: '24px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', border: '1px solid rgba(0,128,128,0.14)', flexShrink: 0 }} />
+                    {/* Mini metrics */}
+                    <div style={{ width: '130px', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#030f0a', flexShrink: 0 }}>
+                      <div className="phone-widget" style={{ background: 'rgba(0,128,128,0.08)', borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(0,128,128,0.12)' }}>
+                        <div style={{ height: '5px', width: '38px', background: 'rgba(255,255,255,0.12)', borderRadius: '3px', marginBottom: '4px' }} />
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '11px', color: '#00bfa5', fontWeight: 700 }}>$2,150</span>
                       </div>
-
-                      {/* Mini metrics */}
-                      <div style={{ width: '130px', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '6px', background: '#030f0a', flexShrink: 0 }}>
-                        <div className="phone-widget" style={{ background: 'rgba(0,128,128,0.08)', borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(0,128,128,0.12)' }}>
-                          <div style={{ height: '5px', width: '38px', background: 'rgba(255,255,255,0.12)', borderRadius: '3px', marginBottom: '4px' }} />
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '11px', color: '#00bfa5', fontWeight: 700 }}>$2,150</span>
-                        </div>
-                        <div className="phone-widget" style={{ background: 'rgba(0,128,128,0.07)', borderRadius: '6px', padding: '8px 6px', border: '1px solid rgba(0,128,128,0.1)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                          <svg width="52" height="52" aria-hidden="true">
-                            <circle cx="26" cy="26" r="18" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5"/>
-                            <circle className="progress-ring" cx="26" cy="26" r="18" fill="none" stroke="#00bfa5" strokeWidth="5"/>
-                          </svg>
-                          <span className="counter-val" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '16px', color: '#fff', fontWeight: 700, lineHeight: 1 }}>0</span>
-                          <span style={{ fontSize: '7px', color: 'rgba(0,200,150,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Inter',sans-serif" }}>{metricLabel}</span>
-                        </div>
-                        <div className="phone-widget" style={{ background: 'rgba(255,33,87,0.06)', borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(255,33,87,0.1)' }}>
-                          <div style={{ height: '5px', width: '38px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', marginBottom: '4px' }} />
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '11px', color: '#FF2157', fontWeight: 700 }}>-$1,980</span>
-                        </div>
-                        <div className="phone-widget" style={{ background: 'rgba(254,153,0,0.06)', borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(254,153,0,0.1)' }}>
-                          <div style={{ height: '5px', width: '32px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', marginBottom: '4px' }} />
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '9px', color: '#FE9900', fontWeight: 600 }}>3 issues</span>
-                        </div>
+                      <div className="phone-widget" style={{ background: 'rgba(0,128,128,0.07)', borderRadius: '6px', padding: '8px 6px', border: '1px solid rgba(0,128,128,0.1)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <svg width="52" height="52" aria-hidden="true">
+                          <circle cx="26" cy="26" r="18" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5"/>
+                          <circle className="progress-ring" cx="26" cy="26" r="18" fill="none" stroke="#00bfa5" strokeWidth="5"/>
+                        </svg>
+                        <span className="counter-val" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '16px', color: '#fff', fontWeight: 700, lineHeight: 1 }}>0</span>
+                        <span style={{ fontSize: '7px', color: 'rgba(0,200,150,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Inter',sans-serif" }}>{metricLabel}</span>
                       </div>
-
-                    </div>{/* end screen */}
-                  </div>{/* end lid */}
-
-                  {/* Hinge */}
-                  <div className="laptop-hinge" style={{ width: '504px' }} />
-
-                  {/* Body / keyboard base */}
-                  <div className="laptop-body" style={{ width: '516px', padding: '14px 22px 18px' }}>
-
-                    {/* Fn key row */}
-                    <div style={{ display: 'flex', gap: '2px', marginBottom: '4px' }}>
-                      {Array.from({ length: 14 }).map((_, i) => (
-                        <div key={i} className="laptop-key-fn" style={{ flex: i === 0 || i === 13 ? 1.6 : 1, height: '11px' }} />
-                      ))}
+                      <div className="phone-widget" style={{ background: 'rgba(255,33,87,0.06)', borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(255,33,87,0.1)' }}>
+                        <div style={{ height: '5px', width: '38px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', marginBottom: '4px' }} />
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '11px', color: '#FF2157', fontWeight: 700 }}>-$1,980</span>
+                      </div>
+                      <div className="phone-widget" style={{ background: 'rgba(254,153,0,0.06)', borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(254,153,0,0.1)' }}>
+                        <div style={{ height: '5px', width: '32px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', marginBottom: '4px' }} />
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '9px', color: '#FE9900', fontWeight: 600 }}>3 issues</span>
+                      </div>
                     </div>
 
-                    {/* Number row */}
-                    <div style={{ display: 'flex', gap: '2px', marginBottom: '3px' }}>
-                      {[1,1,1,1,1,1,1,1,1,1,1,1,1,1.8].map((flex,i) => (
-                        <div key={i} className="laptop-key-std" style={{ flex, height: '21px' }} />
-                      ))}
-                    </div>
+                  </div>{/* end screen content */}
 
-                    {/* QWERTY row */}
-                    <div style={{ display: 'flex', gap: '2px', marginBottom: '3px' }}>
-                      {[1.6,1,1,1,1,1,1,1,1,1,1,1,1,1.4].map((flex,i) => (
-                        <div key={i} className="laptop-key-std" style={{ flex, height: '21px' }} />
-                      ))}
-                    </div>
 
-                    {/* ASDF row */}
-                    <div style={{ display: 'flex', gap: '2px', marginBottom: '3px' }}>
-                      {[1.9,1,1,1,1,1,1,1,1,1,1,1,2.1].map((flex,i) => (
-                        <div key={i} className="laptop-key-std" style={{ flex, height: '21px' }} />
-                      ))}
-                    </div>
-
-                    {/* ZXCV row */}
-                    <div style={{ display: 'flex', gap: '2px', marginBottom: '3px' }}>
-                      {[2.4,1,1,1,1,1,1,1,1,1,1,2.6].map((flex,i) => (
-                        <div key={i} className="laptop-key-std" style={{ flex, height: '21px' }} />
-                      ))}
-                    </div>
-
-                    {/* Spacebar row */}
-                    <div style={{ display: 'flex', gap: '2px', marginBottom: '12px' }}>
-                      {[1,1,1,6,1,1,0.7,0.7,0.7,0.7].map((flex,i) => (
-                        <div key={i} className="laptop-key-std" style={{ flex, height: '21px' }} />
-                      ))}
-                    </div>
-
-                    {/* Force Touch trackpad */}
-                    <div className="laptop-trackpad" style={{ width: '172px', height: '100px', margin: '0 auto' }} />
-
-                  </div>
-
-                  {/* Bottom lip */}
-                  <div style={{ width: '516px', height: '5px', background: 'linear-gradient(180deg,#141416,#0a0a0c)', borderRadius: '0 0 6px 6px', boxShadow: '0 2px 6px rgba(0,0,0,0.6)' }} />
-
-                </div>{/* end laptop assembly */}
+                </div>{/* end mockup image wrapper */}
 
                 {/* Floating badge — top left */}
                 <div className="floating-badge absolute flex top-4 lg:top-8 left-0 lg:left-[-60px] floating-ui-badge rounded-xl lg:rounded-2xl p-3 lg:p-4 items-center gap-3 z-30">
