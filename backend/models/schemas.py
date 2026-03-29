@@ -54,13 +54,13 @@ class FinancialProfile(BaseModel):
 class IncomeSourceItem(BaseModel):
     name: str
     type: str
-    amount: float
+    amount: float | None = None   # AI may return null before full extraction
     frequency: str = "monthly"
 
 
 class DebtItem(BaseModel):
     name: str
-    balance: float
+    balance: float | None = None  # AI may return null before full extraction
     months_remaining: int | None = None
     interest_rate: float | None = None
     minimum_payment: float | None = None
@@ -68,21 +68,21 @@ class DebtItem(BaseModel):
 
 class RecurringExpenseItem(BaseModel):
     name: str
-    amount: float
+    amount: float | None = None   # AI may return null before full extraction
     frequency: str = "monthly"
 
 
 class OutlierItem(BaseModel):
     name: str
     kind: str
-    amount: float
+    amount: float | None = None   # AI may return null before full extraction
     month: str
 
 
 class AccountItem(BaseModel):
     name: str
     type: str
-    balance: float
+    balance: float | None = None  # AI may return null before full extraction
     interest_rate: float | None = None
 
 
@@ -118,6 +118,8 @@ class ChatRequest(BaseModel):
     user_id: str
     message: str
     profile_target: Literal["before", "after"] = "before"
+    chat_mode: Literal["onboarding", "simulation"] = "onboarding"
+    profile_user_id: str | None = None  # real user_id for profile extraction (defaults to user_id)
 
 
 class ChatResponse(BaseModel):
@@ -138,6 +140,8 @@ class Issue(BaseModel):
     explanation: str
     action: str
     actionType: str
+    metrics: dict[str, float | int | str | bool | None] | None = None
+    reasons: list[str] | None = None
 
 
 class IssueDetectResponse(BaseModel):

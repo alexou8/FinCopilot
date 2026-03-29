@@ -1,4 +1,4 @@
-"""Simulation engine — deterministic net worth projections + AI helpers."""
+"""Simulation engine - deterministic net worth projections + AI helpers."""
 from __future__ import annotations
 
 import json
@@ -20,8 +20,6 @@ from backend.services.llm import chat_completion
 logger = logging.getLogger(__name__)
 
 
-# ── Helpers ───────────────────────────────────────────────────────────
-
 def _normalize_monthly(amount: float, frequency: str | None) -> float:
     freq = (frequency or "monthly").lower()
     if freq == "weekly":
@@ -34,37 +32,34 @@ def _normalize_monthly(amount: float, frequency: str | None) -> float:
 
 
 def _month_labels(n: int) -> list[str]:
-    """Return n month labels starting from next month, e.g. ['2026-04', '2026-05', ...]."""
+    """Return month labels starting from next month."""
     today = date.today()
-    # Start from next month
     start = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
     labels = []
     for i in range(n):
-        m = (start.month - 1 + i) % 12 + 1
-        y = start.year + (start.month - 1 + i) // 12
-        labels.append(f"{y:04d}-{m:02d}")
+        month = (start.month - 1 + i) % 12 + 1
+        year = start.year + (start.month - 1 + i) // 12
+        labels.append(f"{year:04d}-{month:02d}")
     return labels
 
-
-# ── Summary ───────────────────────────────────────────────────────────
 
 def calculate_summary(profile: ComparisonProfile) -> SimulationSummary:
     """Derive monthly summary stats from a ComparisonProfile."""
     monthly_income = sum(
-        _normalize_monthly(s.amount, s.frequency)
+        _normalize_monthly(s.amount or 0.0, s.frequency)
         for s in (profile.income_sources or [])
     )
     monthly_recurring = sum(
-        _normalize_monthly(e.amount, e.frequency)
+        _normalize_monthly(e.amount or 0.0, e.frequency)
         for e in (profile.recurring_expenses or [])
     )
     monthly_debt_payments = sum(
-        d.minimum_payment or 0.0
-        for d in (profile.debts or [])
+        debt.minimum_payment or 0.0
+        for debt in (profile.debts or [])
     )
     monthly_expenses = monthly_recurring + monthly_debt_payments
-    debt_total = sum(d.balance for d in (profile.debts or []))
-    account_total = sum(a.balance for a in (profile.accounts or []))
+    debt_total = sum((d.balance or 0.0) for d in (profile.debts or []))
+    account_total = sum((a.balance or 0.0) for a in (profile.accounts or []))
 
     return SimulationSummary(
         monthly_income=round(monthly_income, 2),
@@ -75,94 +70,115 @@ def calculate_summary(profile: ComparisonProfile) -> SimulationSummary:
     )
 
 
-# ── Net worth trajectory ──────────────────────────────────────────────
-
-def calculate_monthly_net_worth(
+def project_monthly_balances(
     profile: ComparisonProfile,
     months: int = 12,
-) -> list[MonthlyNetWorthPoint]:
-    """Deterministically project monthly net worth for `months` months.
-
-    Net worth = total account balances − total debt balances.
-    Each month: apply surplus, compound savings interest, apply one-time outliers,
-    reduce debt balances by minimum payments.
-    """
+) -> list[dict]:
+    """Project monthly liquid balances, debt totals, and net worth."""
     accounts = profile.accounts or []
     debts = profile.debts or []
     outliers = profile.outliers or []
 
-    # Mutable state
-    account_balances: dict[str, float] = {a.name: a.balance for a in accounts}
-    debt_balances: dict[str, float] = {d.name: d.balance for d in debts}
+    # Mutable state — treat None balances as 0 so the engine always gets a float
+    account_balances: dict[str, float] = {a.name: (a.balance or 0.0) for a in accounts}
+    debt_balances: dict[str, float] = {d.name: (d.balance or 0.0) for d in debts}
 
     monthly_income = sum(
-        _normalize_monthly(s.amount, s.frequency)
+        _normalize_monthly(s.amount or 0.0, s.frequency)
         for s in (profile.income_sources or [])
     )
     monthly_recurring = sum(
-        _normalize_monthly(e.amount, e.frequency)
+        _normalize_monthly(e.amount or 0.0, e.frequency)
         for e in (profile.recurring_expenses or [])
     )
-
-    # Monthly interest rates for accounts (annual % → monthly)
     account_rates = {
-        a.name: (a.interest_rate or 0.0) / 100 / 12
-        for a in accounts
+        account.name: (account.interest_rate or 0.0) / 100 / 12
+        for account in accounts
     }
 
-    month_labels = _month_labels(months)
-    result: list[MonthlyNetWorthPoint] = []
+    def _primary_account_name() -> str | None:
+        if not account_balances:
+            return None
+        return next(
+            (
+                name
+                for name in account_balances
+                if "chequing" in name.lower() or "checking" in name.lower()
+            ),
+            next(iter(account_balances)),
+        )
 
-    for label in month_labels:
-        # 1. Calculate surplus this month (income minus recurring; debt payments handled separately)
+    results: list[dict] = []
+    for label in _month_labels(months):
         total_debt_payments = sum(
-            min(d.minimum_payment or 0.0, debt_balances.get(d.name, 0.0))
-            for d in debts
+            min(debt.minimum_payment or 0.0, debt_balances.get(debt.name, 0.0))
+            for debt in debts
         )
         surplus = monthly_income - monthly_recurring - total_debt_payments
 
-        # 2. Distribute surplus across accounts (add to first chequing/savings found, or split evenly)
-        if account_balances:
-            primary = next(
-                (n for n in account_balances if "chequing" in n.lower() or "checking" in n.lower()),
-                next(iter(account_balances)),
-            )
+        primary = _primary_account_name()
+        if primary:
             account_balances[primary] = account_balances[primary] + surplus
 
-        # 3. Apply monthly interest to all accounts
         for name in account_balances:
             rate = account_rates.get(name, 0.0)
             if rate > 0:
                 account_balances[name] *= (1 + rate)
 
-        # 4. Apply outlier events for this month
+        month_outlier_impact = 0.0
+        month_outlier_names: list[str] = []
         for outlier in outliers:
-            if outlier.month == label:
-                positive_kinds = {"income", "benefit", "refund", "rebate"}
-                impact = (
-                    outlier.amount
-                    if (outlier.kind or "").lower() in positive_kinds
-                    else -outlier.amount
-                )
-                if account_balances:
-                    primary = next(
-                        (n for n in account_balances if "chequing" in n.lower() or "checking" in n.lower()),
-                        next(iter(account_balances)),
-                    )
-                    account_balances[primary] += impact
+            if outlier.month != label:
+                continue
+            positive_kinds = {"income", "benefit", "refund", "rebate"}
+            impact = (
+                (outlier.amount or 0.0)
+                if (outlier.kind or "").lower() in positive_kinds
+                else -(outlier.amount or 0.0)
+            )
+            month_outlier_impact += impact
+            month_outlier_names.append(outlier.name)
+            primary = _primary_account_name()
+            if primary:
+                account_balances[primary] += impact
 
-        # 5. Pay down debts
-        for d in debts:
-            payment = min(d.minimum_payment or 0.0, debt_balances.get(d.name, 0.0))
-            debt_balances[d.name] = max(0.0, debt_balances.get(d.name, 0.0) - payment)
+        for debt in debts:
+            payment = min(
+                debt.minimum_payment or 0.0,
+                debt_balances.get(debt.name, 0.0),
+            )
+            debt_balances[debt.name] = max(
+                0.0,
+                debt_balances.get(debt.name, 0.0) - payment,
+            )
 
-        net_worth = sum(account_balances.values()) - sum(debt_balances.values())
-        result.append(MonthlyNetWorthPoint(month=label, value=round(net_worth, 2)))
+        liquid_balance = round(sum(account_balances.values()), 2)
+        debt_total = round(sum(debt_balances.values()), 2)
+        results.append(
+            {
+                "month": label,
+                "liquid_balance": liquid_balance,
+                "debt_total": debt_total,
+                "net_worth": round(liquid_balance - debt_total, 2),
+                "monthly_surplus": round(surplus, 2),
+                "outlier_impact": round(month_outlier_impact, 2),
+                "outlier_names": month_outlier_names,
+            }
+        )
 
-    return result
+    return results
 
 
-# ── AI: build after-profile ───────────────────────────────────────────
+def calculate_monthly_net_worth(
+    profile: ComparisonProfile,
+    months: int = 12,
+) -> list[MonthlyNetWorthPoint]:
+    """Deterministically project monthly net worth for `months` months."""
+    return [
+        MonthlyNetWorthPoint(month=point["month"], value=point["net_worth"])
+        for point in project_monthly_balances(profile, months)
+    ]
+
 
 async def build_after_profile(
     profile_before: ComparisonProfile,
@@ -184,11 +200,12 @@ async def build_after_profile(
         data = json.loads(raw)
         return ComparisonProfile(**data)
     except Exception:
-        logger.exception("Failed to build after-profile for prompt %r — using before-profile as fallback", prompt)
+        logger.exception(
+            "Failed to build after-profile for prompt %r; using before-profile as fallback",
+            prompt,
+        )
         return profile_before
 
-
-# ── AI: recommendation ────────────────────────────────────────────────
 
 async def generate_recommendation(
     scenario: str,
@@ -220,11 +237,13 @@ async def generate_recommendation(
         data = json.loads(raw)
         return SimulationRecommendation(**data)
     except Exception:
-        logger.exception("Failed to generate recommendation — using fallback")
+        logger.exception("Failed to generate recommendation; using fallback")
         feasible = summary_after.monthly_surplus >= 0
         return SimulationRecommendation(
             feasible=feasible,
-            headline="Simulation complete" if feasible else "This scenario creates a monthly deficit",
+            headline="Simulation complete"
+            if feasible
+            else "This scenario creates a monthly deficit",
             body=(
                 f"After applying the scenario, your monthly surplus would be "
                 f"${summary_after.monthly_surplus:,.0f}/month "

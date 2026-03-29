@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { sendMessage } from '../services/chatService';
+import { demoScenario } from '../data/demoScenario';
 
 function generateId() {
   return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -34,11 +35,20 @@ export function useChat() {
       };
       addMessage(aiMsg);
 
-      if (response.profileUpdates && Object.keys(response.profileUpdates).length > 0) {
-        setProfile(prev => ({ ...(prev || {}), ...response.profileUpdates }));
-        Object.keys(response.profileUpdates).forEach(field => {
-          updateProfileField(field);
-        });
+      if (response.profileUpdates) {
+        // Only merge non-null sections so a partial extraction doesn't clear existing data
+        const update = Object.fromEntries(
+          Object.entries(response.profileUpdates).filter(([, v]) => v != null)
+        );
+        if (Object.keys(update).length > 0) {
+          setProfile(prev => ({ ...(prev || {}), ...update }));
+          Object.keys(update).forEach(field => updateProfileField(field));
+        }
+      }
+
+      if (response.type === 'scenario') {
+        setScenario(demoScenario);
+        setActivePanel('scenario');
       }
     } catch (err) {
       addMessage({

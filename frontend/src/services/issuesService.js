@@ -1,7 +1,7 @@
 import { demoIssues } from '../data/demoIssues';
 
 const USE_MOCK = false;
-const API_BASE = 'http://localhost:8000';
+const API_BASE = '/api';
 
 export async function getIssues(userId = 'demo-user') {
   if (USE_MOCK) {
@@ -13,6 +13,7 @@ export async function getIssues(userId = 'demo-user') {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId }),
   });
+  if (res.status === 404) return [];  // no profile yet — not an error
   if (!res.ok) throw new Error('Issues fetch failed');
   const data = await res.json();
   return data.issues;

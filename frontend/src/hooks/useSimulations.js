@@ -2,10 +2,10 @@
 
 import { useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { runSimulation, getSimulations, deleteSimulation } from '../services/simulationService';
+import { runSimulation, getSimulations, deleteSimulation, SimulationError } from '../services/simulationService';
 
 export function useSimulations() {
-  const { simulations, setSimulations, activeSimulation, setActiveSimulation, profile, authUser } = useApp();
+  const { simulations, setSimulations, activeSimulation, setActiveSimulation, authUser } = useApp();
 
   const userId = authUser?.id ?? 'demo_user';
 
@@ -20,16 +20,11 @@ export function useSimulations() {
 
   const run = useCallback(async (prompt) => {
     if (!prompt?.trim()) return null;
-    try {
-      const result = await runSimulation({ prompt, profileBefore: profile }, userId);
-      setSimulations(prev => [result, ...prev]);
-      setActiveSimulation(result);
-      return result;
-    } catch (err) {
-      console.error('Simulation failed:', err);
-      return null;
-    }
-  }, [profile, userId, setSimulations, setActiveSimulation]);
+    const result = await runSimulation({ prompt }, userId);
+    setSimulations(prev => [result, ...prev]);
+    setActiveSimulation(result);
+    return result;
+  }, [userId, setSimulations, setActiveSimulation]);
 
   const remove = useCallback(async (id) => {
     try {
