@@ -1,6 +1,6 @@
 'use client';
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const fmtY = n => n >= 1000 ? '$' + (n / 1000).toFixed(1) + 'k' : '$' + n;
 
@@ -22,9 +22,6 @@ function CustomTooltip({ active, payload, label }) {
 export function ComparisonChart({ trajectories, goalAmount }) {
   if (!trajectories || !trajectories.length) return null;
 
-  // Determine goal value: explicit prop > first trajectory data point > hidden
-  const goal = goalAmount ?? trajectories[0]?.goal ?? null;
-
   return (
     <div className="neu-inset-sm" style={{ padding: '18px 14px 14px', borderRadius: '14px' }}>
       <ResponsiveContainer width="100%" height={200}>
@@ -43,9 +40,6 @@ export function ComparisonChart({ trajectories, goalAmount }) {
           <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono' }} />
           <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fontFamily: 'JetBrains Mono' }} />
           <Tooltip content={<CustomTooltip />} />
-          {goal != null && (
-            <ReferenceLine y={goal} stroke="#FE9900" strokeDasharray="4 4" label={{ value: `Goal ($${goal.toLocaleString()})`, fill: '#FE9900', fontSize: 10 }} />
-          )}
           <Area type="monotone" dataKey="current"  name="Current path" stroke="#a3b1c6" strokeWidth={2}   fill="url(#gradCurrent)"  dot={false} />
           <Area type="monotone" dataKey="scenario" name="With changes"  stroke="#006666" strokeWidth={2.5} fill="url(#gradScenario)" dot={false} />
         </AreaChart>
