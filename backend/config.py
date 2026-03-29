@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Ensure we load .env from the project root regardless of working directory
-_env_path = Path(__file__).resolve().parent / ".env"
+_env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(_env_path)
 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
