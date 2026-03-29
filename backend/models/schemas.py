@@ -54,13 +54,13 @@ class FinancialProfile(BaseModel):
 class IncomeSourceItem(BaseModel):
     name: str
     type: str
-    amount: float
+    amount: float | None = None   # AI may return null before full extraction
     frequency: str = "monthly"
 
 
 class DebtItem(BaseModel):
     name: str
-    balance: float
+    balance: float | None = None  # AI may return null before full extraction
     months_remaining: int | None = None
     interest_rate: float | None = None
     minimum_payment: float | None = None
@@ -68,21 +68,21 @@ class DebtItem(BaseModel):
 
 class RecurringExpenseItem(BaseModel):
     name: str
-    amount: float
+    amount: float | None = None   # AI may return null before full extraction
     frequency: str = "monthly"
 
 
 class OutlierItem(BaseModel):
     name: str
     kind: str
-    amount: float
+    amount: float | None = None   # AI may return null before full extraction
     month: str
 
 
 class AccountItem(BaseModel):
     name: str
     type: str
-    balance: float
+    balance: float | None = None  # AI may return null before full extraction
     interest_rate: float | None = None
 
 

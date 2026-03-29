@@ -51,11 +51,11 @@ def _month_labels(n: int) -> list[str]:
 def calculate_summary(profile: ComparisonProfile) -> SimulationSummary:
     """Derive monthly summary stats from a ComparisonProfile."""
     monthly_income = sum(
-        _normalize_monthly(s.amount, s.frequency)
+        _normalize_monthly(s.amount or 0.0, s.frequency)
         for s in (profile.income_sources or [])
     )
     monthly_recurring = sum(
-        _normalize_monthly(e.amount, e.frequency)
+        _normalize_monthly(e.amount or 0.0, e.frequency)
         for e in (profile.recurring_expenses or [])
     )
     monthly_debt_payments = sum(
@@ -63,8 +63,8 @@ def calculate_summary(profile: ComparisonProfile) -> SimulationSummary:
         for d in (profile.debts or [])
     )
     monthly_expenses = monthly_recurring + monthly_debt_payments
-    debt_total = sum(d.balance for d in (profile.debts or []))
-    account_total = sum(a.balance for a in (profile.accounts or []))
+    debt_total = sum((d.balance or 0.0) for d in (profile.debts or []))
+    account_total = sum((a.balance or 0.0) for a in (profile.accounts or []))
 
     return SimulationSummary(
         monthly_income=round(monthly_income, 2),
@@ -91,16 +91,16 @@ def calculate_monthly_net_worth(
     debts = profile.debts or []
     outliers = profile.outliers or []
 
-    # Mutable state
-    account_balances: dict[str, float] = {a.name: a.balance for a in accounts}
-    debt_balances: dict[str, float] = {d.name: d.balance for d in debts}
+    # Mutable state — treat None balances as 0 so the engine always gets a float
+    account_balances: dict[str, float] = {a.name: (a.balance or 0.0) for a in accounts}
+    debt_balances: dict[str, float] = {d.name: (d.balance or 0.0) for d in debts}
 
     monthly_income = sum(
-        _normalize_monthly(s.amount, s.frequency)
+        _normalize_monthly(s.amount or 0.0, s.frequency)
         for s in (profile.income_sources or [])
     )
     monthly_recurring = sum(
-        _normalize_monthly(e.amount, e.frequency)
+        _normalize_monthly(e.amount or 0.0, e.frequency)
         for e in (profile.recurring_expenses or [])
     )
 
@@ -140,9 +140,9 @@ def calculate_monthly_net_worth(
             if outlier.month == label:
                 positive_kinds = {"income", "benefit", "refund", "rebate"}
                 impact = (
-                    outlier.amount
+                    (outlier.amount or 0.0)
                     if (outlier.kind or "").lower() in positive_kinds
-                    else -outlier.amount
+                    else -(outlier.amount or 0.0)
                 )
                 if account_balances:
                     primary = next(
