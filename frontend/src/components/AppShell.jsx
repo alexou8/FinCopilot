@@ -82,7 +82,8 @@ function Layout() {
                 <IssueAgentCompanion
                   taskId={issueAgentTaskId}
                   sessionId={issueAgentSessionId}
-                  launching={issueResearchLoading && !issueAgentTaskId}
+                  launching={issueResearchLoading}
+                  surface="dashboard"
                 />
               </div>
             </div>

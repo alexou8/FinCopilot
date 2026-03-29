@@ -136,10 +136,15 @@ export function AppProvider({ children, isDemo = false }) {
       throw new Error('Issue rule_id is required');
     }
 
+    let task = buildIssueAgentTask({ issue });
+
     setActiveIssue(issue);
     setIssueResearch(null);
     setIssueResearchError(null);
     setIssueResearchLoading(true);
+    saveIssueAgentTask(task);
+    setIssueAgentTaskId(task.taskId);
+    setIssueAgentSessionId(null);
     setActiveNav('browserAgent');
 
     try {
@@ -149,10 +154,17 @@ export function AppProvider({ children, isDemo = false }) {
         issue,
         isDemo,
       });
-      let task = buildIssueAgentTask({ issue, research });
-      saveIssueAgentTask(task);
-      setIssueAgentTaskId(task.taskId);
-      setIssueAgentSessionId(null);
+      task = updateIssueAgentTask(task.taskId, current => ({
+        ...current,
+        launching: false,
+        state: 'running',
+        research,
+        issue: {
+          ...current.issue,
+          title: research?.title || current.issue?.title,
+          action: research?.action || current.issue?.action,
+        },
+      })) || task;
       setIssueResearch(research);
 
       if (!isDemo) {
@@ -165,6 +177,7 @@ export function AppProvider({ children, isDemo = false }) {
 
           task = updateIssueAgentTask(task.taskId, current => ({
             ...current,
+            launching: false,
             sessionId: session.session_id,
             runtime: {
               state: session.state,
@@ -178,6 +191,8 @@ export function AppProvider({ children, isDemo = false }) {
           console.error('Visible browser agent failed to start:', agentError);
           task = updateIssueAgentTask(task.taskId, current => ({
             ...current,
+            launching: false,
+            state: 'failed',
             agentUnavailableReason: agentError.message || 'Visible browser agent unavailable.',
             runtime: {
               state: 'failed',
@@ -191,6 +206,19 @@ export function AppProvider({ children, isDemo = false }) {
       return research;
     } catch (error) {
       console.error('Issue research failed:', error);
+      task = updateIssueAgentTask(task.taskId, current => ({
+        ...current,
+        launching: false,
+        state: 'failed',
+        agentUnavailableReason: error.message || 'Could not load guided issue research.',
+        runtime: {
+          ...(current.runtime || {}),
+          state: 'failed',
+          active: false,
+          message: error.message || 'Could not load guided issue research.',
+          error: error.message || 'Could not load guided issue research.',
+        },
+      })) || task;
       setIssueResearchError('Could not load guided issue research.');
       throw error;
     } finally {

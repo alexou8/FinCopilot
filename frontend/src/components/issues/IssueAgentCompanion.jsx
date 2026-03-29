@@ -22,6 +22,7 @@ import {
 } from '../../services/browserAgentService';
 import {
   getLastIssueAgentTaskId,
+  getIssueAgentStorageKey,
   loadIssueAgentTask,
   updateIssueAgentTask,
 } from '../../lib/issueAgent';
@@ -38,12 +39,18 @@ const STATUS_META = {
   failed: { label: 'Runtime issue', severity: 'critical' },
 };
 
+const REPORT_STATUS_META = {
+  pending: { label: 'Analysis in progress', severity: 'default' },
+  ready: { label: 'Analysis ready', severity: 'success' },
+  limited: { label: 'Limited coverage', severity: 'warning' },
+};
+
 function openUrl(url) {
   if (!url || typeof window === 'undefined') return;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
+export function IssueAgentCompanion({ taskId, sessionId, launching = false, surface = 'dashboard' }) {
   const [task, setTask] = useState(null);
   const [runtime, setRuntime] = useState(null);
   const [answer, setAnswer] = useState('');
@@ -52,48 +59,88 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
   useEffect(() => {
     const resolvedTaskId = taskId || getLastIssueAgentTaskId();
     if (!resolvedTaskId) return;
-    setTask(loadIssueAgentTask(resolvedTaskId));
+    const nextTask = loadIssueAgentTask(resolvedTaskId);
+    setTask(nextTask);
+    setRuntime(nextTask?.runtime || null);
   }, [taskId]);
 
+  useEffect(() => {
+    const resolvedTaskId = taskId || task?.taskId || getLastIssueAgentTaskId();
+    if (typeof window === 'undefined' || !resolvedTaskId) return undefined;
+
+    function handleStorage(event) {
+      if (event.key && event.key !== getIssueAgentStorageKey(resolvedTaskId)) {
+        return;
+      }
+
+      const nextTask = loadIssueAgentTask(resolvedTaskId);
+      if (!nextTask) return;
+      setTask(nextTask);
+      setRuntime(nextTask.runtime || null);
+    }
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [task?.taskId, taskId]);
+
+  const resolvedTaskId = taskId || task?.taskId || null;
   const resolvedSessionId = sessionId || task?.sessionId || null;
 
   useEffect(() => {
     if (!resolvedSessionId) return;
 
-    let mounted = true;
+    let cancelled = false;
+    let timeoutId = null;
 
-    async function poll() {
-      try {
-        const next = await getBrowserAgentStatus(resolvedSessionId);
-        if (!mounted) return;
-        setRuntime(next);
-        if (task?.taskId) {
-          const persisted = updateIssueAgentTask(task.taskId, current => ({
-            ...current,
-            sessionId: resolvedSessionId,
-            runtime: next,
-          }));
-          if (persisted) setTask(persisted);
+    const persistRuntime = nextRuntime => {
+      setRuntime(nextRuntime);
+      if (!resolvedTaskId) return;
+
+      const persisted = updateIssueAgentTask(resolvedTaskId, current => ({
+        ...current,
+        launching: false,
+        state: nextRuntime?.state || current.state,
+        sessionId: resolvedSessionId,
+        runtime: nextRuntime,
+      }));
+      if (persisted) setTask(persisted);
+    };
+
+    const schedulePoll = delay => {
+      timeoutId = window.setTimeout(async () => {
+        try {
+          const next = await getBrowserAgentStatus(resolvedSessionId);
+          if (cancelled) return;
+
+          persistRuntime(next);
+
+          const reportPending = next?.analysis_report?.status === 'pending';
+          const terminal = next?.state === 'done' || next?.state === 'failed';
+          if (!terminal || reportPending) {
+            schedulePoll(getPollDelay(next?.state, reportPending));
+          }
+        } catch (error) {
+          if (cancelled) return;
+
+          const failedRuntime = {
+            state: 'failed',
+            active: false,
+            message: error.message || 'Could not reach the browser agent runtime.',
+            error: error.message || 'Could not reach the browser agent runtime.',
+            analysis_report: runtime?.analysis_report || null,
+          };
+          persistRuntime(failedRuntime);
         }
-      } catch (error) {
-        if (!mounted) return;
-        setRuntime(prev => prev || {
-          state: 'failed',
-          active: false,
-          message: error.message || 'Could not reach the browser agent runtime.',
-          error: error.message || 'Could not reach the browser agent runtime.',
-        });
-      }
-    }
+      }, delay);
+    };
 
-    poll();
-    const interval = window.setInterval(poll, 1500);
+    schedulePoll(0);
 
     return () => {
-      mounted = false;
-      window.clearInterval(interval);
+      cancelled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [resolvedSessionId, task?.taskId]);
+  }, [resolvedSessionId, resolvedTaskId]);
 
   const effectiveRuntime = runtime || task?.runtime || null;
   const effectiveState = effectiveRuntime?.state || task?.state || 'idle';
@@ -102,6 +149,7 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
   const topSourceUrl = sources[0]?.url || task?.research?.search_url;
   const currentMessage =
     effectiveRuntime?.message ||
+    (task?.launching ? 'Preparing the browser agent workspace.' : null) ||
     task?.research?.browser_goal ||
     'Preparing the browser agent.';
   const currentQuestion = effectiveRuntime?.question || null;
@@ -114,6 +162,11 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
   const domainsAnalyzed =
     effectiveRuntime?.domains_analyzed ||
     new Set(visitedPages.map(page => page.domain)).size;
+  const analysisReport =
+    effectiveRuntime?.analysis_report ||
+    buildDerivedAnalysisReport(task, effectiveState, currentMessage, agentError);
+  const reportMeta = REPORT_STATUS_META[analysisReport?.status] || REPORT_STATUS_META.pending;
+  const compactReport = surface === 'popup';
 
   const currentStep = useMemo(() => {
     if (!task?.research?.steps?.length) return null;
@@ -129,6 +182,7 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
       if (task?.taskId) {
         const persisted = updateIssueAgentTask(task.taskId, current => ({
           ...current,
+          launching: false,
           sessionId: resolvedSessionId,
           runtime: next,
         }));
@@ -146,6 +200,8 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
       if (task?.taskId) {
         const persisted = updateIssueAgentTask(task.taskId, current => ({
           ...current,
+          launching: false,
+          state: 'failed',
           sessionId: resolvedSessionId,
           runtime: failedRuntime,
         }));
@@ -168,6 +224,7 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
     if (!task?.taskId) return;
     const persisted = updateIssueAgentTask(task.taskId, current => ({
       ...current,
+      launching: false,
       state: 'done',
       capturedAnswer: answer.trim(),
       result: `Captured evidence: ${answer.trim()}. Bring this back into FinCopilot and decide on the next step.`,
@@ -176,7 +233,7 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
     setAnswer('');
   }
 
-  if (launching) {
+  if ((launching || task?.launching) && !task?.research) {
     return (
       <div style={emptyStateWrapStyle}>
         <NeuCard className="animate-fade-in" style={{ width: '100%', maxWidth: '640px', padding: '28px' }}>
@@ -190,7 +247,7 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
             </div>
           </div>
           <p style={bodyTextStyle}>
-            FinCopilot is opening a visible Chromium window and wiring the live companion state for this issue.
+            FinCopilot is opening the companion workspace, loading the research brief, and wiring the live browser session for this issue.
           </p>
         </NeuCard>
       </div>
@@ -250,11 +307,11 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <NeuButton size="sm" variant="primary" onClick={() => openUrl(task.research?.search_url)}>
+          <NeuButton size="sm" variant="primary" onClick={() => openUrl(task.research?.search_url)} disabled={!task.research?.search_url}>
             <Search size={14} />
             Open search results
           </NeuButton>
-          <NeuButton size="sm" onClick={() => openUrl(topSourceUrl)}>
+          <NeuButton size="sm" onClick={() => openUrl(topSourceUrl)} disabled={!topSourceUrl}>
             <ArrowUpRight size={14} />
             Open top source
           </NeuButton>
@@ -344,6 +401,10 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
             )}
           </NeuCard>
 
+          {!compactReport && analysisReport && (
+            <AnalysisReportCard report={analysisReport} meta={reportMeta} compact={false} />
+          )}
+
           {(effectiveRuntime?.result || task?.result) && (
             <NeuCard style={{ border: '1px solid rgba(0, 166, 61, 0.22)' }}>
               <p style={sectionLabelStyle}>Result</p>
@@ -390,6 +451,10 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
         </div>
 
         <div style={{ flex: '0.9 1 340px', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {compactReport && analysisReport && (
+            <AnalysisReportCard report={analysisReport} meta={reportMeta} compact />
+          )}
+
           <NeuCard>
             <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--ink)', marginBottom: '12px' }}>
               Coverage
@@ -460,6 +525,127 @@ export function IssueAgentCompanion({ taskId, sessionId, launching = false }) {
           </NeuCard>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AnalysisReportCard({ report, meta, compact = false }) {
+  const solutions = compact ? (report?.potential_solutions || []).slice(0, 2) : (report?.potential_solutions || []);
+  const keyFindings = compact ? (report?.key_findings || []).slice(0, 3) : (report?.key_findings || []);
+  const nextSteps = compact ? (report?.recommended_next_steps || []).slice(0, 3) : (report?.recommended_next_steps || []);
+
+  return (
+    <NeuCard style={{ border: report?.status === 'limited' ? '1px solid rgba(254, 153, 0, 0.22)' : undefined }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <p style={sectionLabelStyle}>{compact ? 'Analysis snapshot' : 'Analysis report'}</p>
+          <p style={{ fontSize: compact ? '16px' : '18px', fontWeight: 700, color: 'var(--ink)', lineHeight: 1.35 }}>
+            {report?.headline || 'Analysis in progress'}
+          </p>
+        </div>
+        <NeuBadge severity={meta?.severity || 'default'} label={meta?.label || 'Analysis in progress'} />
+      </div>
+
+      <div className="neu-inset-sm" style={{ padding: '14px 16px', borderRadius: '16px', marginBottom: '14px' }}>
+        <p style={bodyTextStyle}>
+          {report?.summary || 'FinCopilot is still building the solution analysis from the current browser scan.'}
+        </p>
+      </div>
+
+      {keyFindings.length > 0 && (
+        <div style={{ marginBottom: '14px' }}>
+          <p style={sectionLabelStyle}>Key findings</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {keyFindings.map((item, index) => (
+              <div key={`${item}-${index}`} className="neu-inset-sm" style={{ padding: '12px 14px', borderRadius: '14px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--ink)', lineHeight: 1.6 }}>{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginBottom: nextSteps.length > 0 ? '14px' : '0' }}>
+        <p style={sectionLabelStyle}>{compact ? 'Top solutions' : 'Potential solutions'}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {solutions.length > 0 ? (
+            solutions.map((solution, index) => (
+              <SolutionCard key={`${solution.title}-${index}`} solution={solution} compact={compact} />
+            ))
+          ) : (
+            <div className="neu-inset-sm" style={{ padding: '14px 16px', borderRadius: '16px' }}>
+              <p style={bodyTextStyle}>
+                The browser scan is still gathering enough evidence to rank concrete options.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {nextSteps.length > 0 && (
+        <div>
+          <p style={sectionLabelStyle}>Recommended next steps</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {nextSteps.map((step, index) => (
+              <div key={`${step}-${index}`} style={{ display: 'flex', gap: '10px' }}>
+                <span style={{ color: 'var(--primary)', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {index + 1}.
+                </span>
+                <p style={{ fontSize: '12px', color: 'var(--ink)', lineHeight: 1.6 }}>{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {report?.coverage_note && (
+        <p style={{ ...bodyTextStyle, marginTop: '14px', color: report?.status === 'limited' ? '#b45309' : 'var(--ink-muted)' }}>
+          {report.coverage_note}
+        </p>
+      )}
+    </NeuCard>
+  );
+}
+
+function SolutionCard({ solution, compact = false }) {
+  const evidenceUrls = compact ? (solution?.evidence_urls || []).slice(0, 2) : (solution?.evidence_urls || []);
+
+  return (
+    <div className="neu-inset-sm" style={{ padding: '14px 16px', borderRadius: '16px' }}>
+      <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--ink)', marginBottom: '6px' }}>
+        {solution?.title}
+      </p>
+      <p style={{ fontSize: '12px', color: 'var(--ink)', lineHeight: 1.65, marginBottom: '8px' }}>
+        {solution?.description}
+      </p>
+      {solution?.tradeoffs && (
+        <p style={{ fontSize: '12px', color: 'var(--ink-muted)', lineHeight: 1.6, marginBottom: evidenceUrls.length ? '8px' : '0' }}>
+          Trade-offs: {solution.tradeoffs}
+        </p>
+      )}
+      {evidenceUrls.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {evidenceUrls.map((url, index) => (
+            <button
+              key={`${url}-${index}`}
+              onClick={() => openUrl(url)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--primary)',
+                padding: 0,
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontFamily: 'JetBrains Mono, monospace',
+                wordBreak: 'break-word',
+              }}
+            >
+              {getHostLabel(url)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -542,6 +728,44 @@ function getHostLabel(url) {
   } catch (_error) {
     return url;
   }
+}
+
+function getPollDelay(state, reportPending = false) {
+  if (reportPending) return 1200;
+  if (state === 'running' || state === 'question') return 700;
+  if (state === 'paused') return 1100;
+  return 1800;
+}
+
+function buildDerivedAnalysisReport(task, state, currentMessage, agentError) {
+  if (!task) return null;
+
+  if (agentError) {
+    return {
+      status: 'limited',
+      headline: `Limited analysis for ${task.issue?.title || 'this issue'}`,
+      summary: agentError,
+      key_findings: (task.research?.findings || []).slice(0, 3).map(item => `${item.label}: ${item.value}`),
+      potential_solutions: (task.research?.recommendations || []).slice(0, 2).map(item => ({
+        title: item.title,
+        description: item.description,
+        tradeoffs: item.expected_impact || 'Verify the current details before acting.',
+        evidence_urls: (task.research?.sources || []).slice(0, 2).map(source => source.url),
+      })),
+      recommended_next_steps: (task.research?.steps || []).slice(0, 3).map(step => step.action || step.title),
+      coverage_note: 'The live browser run did not finish cleanly, so this report falls back to the guided research brief.',
+    };
+  }
+
+  return {
+    status: 'pending',
+    headline: `Building analysis for ${task.issue?.title || 'this issue'}`,
+    summary: currentMessage || task.research?.summary || 'FinCopilot is still gathering browser evidence and comparing options.',
+    key_findings: (task.research?.findings || []).slice(0, 2).map(item => `${item.label}: ${item.value}`),
+    potential_solutions: [],
+    recommended_next_steps: (task.research?.steps || []).slice(0, 2).map(step => step.action || step.title),
+    coverage_note: 'This summary will update automatically when the browser scan finishes.',
+  };
 }
 
 const emptyStateWrapStyle = {

@@ -103,7 +103,7 @@ function BrowserAgentInner() {
         <div className="neu-inset-sm" style={{ marginTop: '14px', padding: '12px 14px', borderRadius: '14px' }}>
           <p style={sidebarEyebrowStyle}>Workspace</p>
           <p style={sidebarBodyStyle}>
-            Same research flow, but with a dedicated live-agent companion surface for the separate tab.
+            This route mirrors the same live browser-agent workspace shown inside the main dashboard.
           </p>
         </div>
 
@@ -170,6 +170,7 @@ function BrowserAgentInner() {
             taskId={taskId}
             sessionId={sessionId}
             launching={launching && !taskId}
+            surface="dashboard"
           />
         </div>
       </div>
