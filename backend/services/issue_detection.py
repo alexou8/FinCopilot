@@ -1,167 +1,131 @@
+from __future__ import annotations
+
 import json
 import logging
 
-from backend.models.schemas import FinancialProfile, Issue
-from backend.services.llm import chat_completion
+from backend.models.schemas import ComparisonProfile, Issue
 from backend.prompts.explanation import ISSUE_EXPLANATION_SYSTEM_PROMPT
+from backend.services.issue_catalog import get_issue_catalog_entry
+from backend.services.issue_rules import IssueFinding, detect_issues as detect_issue_findings
+from backend.services.llm import chat_completion
 
 logger = logging.getLogger(__name__)
 
-# Display metadata for each rule — title + action shown in the Issues panel
-_RULE_META: dict[str, dict] = {
-    "debt_vs_savings": {
-        "title": "Credit card interest exceeds savings earnings",
-        "action": "See payoff plan",
-        "actionType": "scenario",
-    },
-    "no_interest_savings": {
-        "title": "Savings account earning near-zero interest",
-        "action": "Compare TFSA & HISA options",
-        "actionType": "advice",
-    },
-    "low_emergency_buffer": {
-        "title": "Emergency fund covers less than 1 month of expenses",
-        "action": "Build emergency fund plan",
-        "actionType": "advice",
-    },
-    "spending_exceeds_income": {
-        "title": "Monthly spending exceeds income",
-        "action": "Review budget",
-        "actionType": "advice",
-    },
-    "unrealistic_goal": {
-        "title": "Move-out goal timeline is unrealistic at current savings rate",
-        "action": "Run move-out scenario",
-        "actionType": "scenario",
-    },
-}
+
+def detect_issues(profile: ComparisonProfile) -> list[IssueFinding]:
+    """Return deterministic issue findings for the baseline profile."""
+    return detect_issue_findings(profile)
 
 
-def _normalize_monthly(amount: float, frequency: str) -> float:
-    """Convert an amount to monthly based on its frequency."""
-    freq = frequency.lower()
-    if freq == "weekly":
-        return amount * 4.33
-    if freq == "biweekly":
-        return amount * 2.17
-    return amount  # already monthly
+def _fmt_currency(value: float | int | None) -> str:
+    if value is None:
+        return "unknown"
+    return f"${value:,.0f}"
 
 
-def detect_issues(profile: FinancialProfile) -> list[dict]:
-    """Run deterministic rules against the profile. Returns raw issues (no explanations yet)."""
-    issues: list[dict] = []
+def _fallback_explanation(finding: IssueFinding) -> str:
+    metrics = finding.metrics
+    reasons = " ".join(finding.reasons)
 
-    monthly_income = 0.0
-    if profile.income and profile.income.amount:
-        monthly_income = _normalize_monthly(
-            profile.income.amount, profile.income.frequency or "monthly"
+    if finding.rule_id == "debt_vs_savings":
+        return (
+            f"You have about {_fmt_currency(metrics.get('high_interest_debt_balance'))} of high-interest debt "
+            f"while {_fmt_currency(metrics.get('idle_savings_balance'))} sits at only "
+            f"{metrics.get('savings_rate', 0)}% APY. {reasons}"
         )
-
-    total_monthly_expenses = 0.0
-    if profile.expenses:
-        for exp in profile.expenses:
-            total_monthly_expenses += _normalize_monthly(exp.amount, exp.frequency)
-
-    total_account_balances = 0.0
-    total_savings = 0.0
-    if profile.accounts:
-        for acc in profile.accounts:
-            total_account_balances += acc.balance
-            if acc.type.lower() == "savings":
-                total_savings += acc.balance
-
-    monthly_surplus = monthly_income - total_monthly_expenses
-
-    # Rule 1: High-interest debt + idle savings
-    has_high_interest_debt = False
-    if profile.debt:
-        has_high_interest_debt = any(
-            d.interest_rate is not None and d.interest_rate > 10 for d in profile.debt
+    if finding.rule_id == "low_yield_savings":
+        return (
+            f"Your savings balance of {_fmt_currency(metrics.get('savings_balance'))} is earning only "
+            f"{metrics.get('savings_rate', 0)}% APY. {reasons}"
         )
-    has_idle_savings = False
-    if profile.accounts:
-        has_idle_savings = any(
-            a.balance > 500 and (a.interest_rate is None or a.interest_rate == 0)
-            for a in profile.accounts
+    if finding.rule_id == "low_emergency_buffer":
+        return (
+            f"You have about {_fmt_currency(metrics.get('liquid_balance'))} available for "
+            f"{_fmt_currency(metrics.get('monthly_required'))} of monthly obligations, or roughly "
+            f"{metrics.get('emergency_months', 0)} months of cushion. {reasons}"
         )
-    if has_high_interest_debt and has_idle_savings:
-        issues.append({"rule_id": "debt_vs_savings", "severity": "critical"})
-
-    # Rule 2: Savings in non-interest-bearing account
-    if profile.accounts:
-        for acc in profile.accounts:
-            if acc.type.lower() == "savings" and (
-                acc.interest_rate is None or acc.interest_rate == 0
-            ):
-                issues.append({"rule_id": "no_interest_savings", "severity": "warning"})
-                break
-
-    # Rule 3: Variable income + low emergency buffer
-    if (
-        profile.income
-        and profile.income.is_variable
-        and total_monthly_expenses > 0
-        and total_account_balances < total_monthly_expenses * 2
-    ):
-        issues.append({"rule_id": "low_emergency_buffer", "severity": "critical"})
-
-    # Rule 4: Monthly expenses exceed monthly income
-    if monthly_income > 0 and total_monthly_expenses > monthly_income:
-        issues.append({"rule_id": "spending_exceeds_income", "severity": "critical"})
-
-    # Rule 5: Goal timeline unrealistic
-    if (
-        profile.decision
-        and profile.decision.target_amount is not None
-        and profile.decision.deadline_months is not None
-        and profile.decision.deadline_months > 0
-        and monthly_surplus > 0
-    ):
-        months_needed = (profile.decision.target_amount - total_savings) / monthly_surplus
-        if months_needed > profile.decision.deadline_months:
-            issues.append({"rule_id": "unrealistic_goal", "severity": "warning"})
-
-    return issues
+    if finding.rule_id == "negative_monthly_cashflow":
+        return (
+            f"Your current monthly income is {_fmt_currency(metrics.get('monthly_income'))}, but your recurring "
+            f"obligations are about {_fmt_currency(metrics.get('monthly_expenses'))}. {reasons}"
+        )
+    if finding.rule_id == "high_rent_burden":
+        return (
+            f"Rent is using about {metrics.get('rent_burden_percent', 0)}% of your monthly income "
+            f"({_fmt_currency(metrics.get('monthly_rent'))} out of {_fmt_currency(metrics.get('monthly_income'))}). "
+            f"{reasons}"
+        )
+    if finding.rule_id == "tuition_or_outlier_shortfall":
+        return (
+            f"In {metrics.get('crunch_month')}, a planned one-time cost changes your cash by "
+            f"{_fmt_currency(metrics.get('outlier_impact'))} and leaves you near "
+            f"{_fmt_currency(metrics.get('projected_liquid_balance'))}. {reasons}"
+        )
+    if finding.rule_id == "decision_timeline_unrealistic":
+        months_needed = metrics.get("months_needed")
+        if months_needed is None:
+            return (
+                f"This decision needs {_fmt_currency(metrics.get('target_amount'))}, but your current monthly surplus "
+                f"is {_fmt_currency(metrics.get('monthly_surplus'))}. {reasons}"
+            )
+        return (
+            f"This decision needs about {_fmt_currency(metrics.get('target_amount'))} and looks closer to "
+            f"{months_needed} months away than the requested {metrics.get('deadline_months')} months. {reasons}"
+        )
+    return reasons or "This issue needs attention."
 
 
-async def explain_issues(issues: list[dict], profile: FinancialProfile) -> list[Issue]:
-    """Generate plain-language explanations for detected issues via a single LLM call."""
-    if not issues:
-        return []
-
-    issue_descriptions = "\n".join(
-        f"- {i['rule_id']} (severity: {i['severity']})" for i in issues
-    )
-
-    user_message = (
-        f"User's financial profile:\n{profile.model_dump_json(indent=2)}\n\n"
-        f"Detected issues:\n{issue_descriptions}"
-    )
-
+async def _generate_llm_explanations(
+    findings: list[IssueFinding],
+    profile: ComparisonProfile,
+) -> dict[str, str]:
+    payload = {
+        "profile": profile.model_dump(mode="json"),
+        "issues": [
+            {
+                "rule_id": finding.rule_id,
+                "severity": finding.severity,
+                "metrics": finding.metrics,
+                "reasons": finding.reasons,
+            }
+            for finding in findings
+        ],
+    }
     messages = [
         {"role": "system", "content": ISSUE_EXPLANATION_SYSTEM_PROMPT},
-        {"role": "user", "content": user_message},
+        {"role": "user", "content": json.dumps(payload, indent=2)},
     ]
+    raw = await chat_completion(messages, temperature=0.3, json_mode=True)
+    return json.loads(raw).get("explanations", {})
+
+
+async def explain_issues(
+    findings: list[IssueFinding],
+    profile: ComparisonProfile,
+) -> list[Issue]:
+    """Optionally rewrite deterministic findings into friendlier issue cards."""
+    if not findings:
+        return []
 
     try:
-        raw = await chat_completion(messages, temperature=0.3, json_mode=True)
-        explanations = json.loads(raw).get("explanations", {})
+        llm_explanations = await _generate_llm_explanations(findings, profile)
     except Exception:
         logger.exception("Issue explanation LLM call failed")
-        explanations = {}
+        llm_explanations = {}
 
-    result: list[Issue] = []
-    for issue in issues:
-        rid = issue["rule_id"]
-        meta = _RULE_META.get(rid, {})
-        result.append(
+    explained: list[Issue] = []
+    for finding in findings:
+        meta = get_issue_catalog_entry(finding.rule_id)
+        explained.append(
             Issue(
-                rule_id=rid,
-                severity=issue["severity"],
-                title=meta.get("title", rid.replace("_", " ").title()),
-                explanation=explanations.get(rid, "Unable to generate explanation."),
-                action=meta.get("action", "Learn more"),
-                actionType=meta.get("actionType", "advice"),
+                rule_id=finding.rule_id,
+                severity=finding.severity or meta.default_severity,
+                title=meta.title,
+                explanation=llm_explanations.get(finding.rule_id, _fallback_explanation(finding)),
+                action=meta.action,
+                actionType=meta.action_type,
+                metrics=finding.metrics,
+                reasons=finding.reasons,
             )
         )
-    return result
+    return explained
