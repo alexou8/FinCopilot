@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BarChart2, History, CheckCircle } from 'lucide-react';
+import { BarChart2, History, CheckCircle, AlertTriangle } from 'lucide-react';
 import { SimulationHistoryCard } from './SimulationHistoryCard';
 import { SimulationResultView } from './SimulationResultView';
 import { SimulationChatPanel } from './SimulationChatPanel';
 import { useSimulations } from '../../hooks/useSimulations';
+import { SimulationError } from '../../services/simulationService';
 
 export function SimulationsPanel() {
   const { simulations, activeSimulation, fetchHistory, run, remove, select } = useSimulations();
   const [isRunning, setIsRunning]   = useState(false);
+  const [runError, setRunError]     = useState(null); // { message, code }
   const [toast, setToast]           = useState(null);
   const toastTimer                  = useRef(null);
 
@@ -31,8 +33,23 @@ export function SimulationsPanel() {
   async function handleRun(prompt) {
     if (!prompt?.trim()) return;
     setIsRunning(true);
-    await run(prompt);
-    setIsRunning(false);
+    setRunError(null);
+    try {
+      await run(prompt);
+    } catch (err) {
+      if (err instanceof SimulationError) {
+        const friendlyMessages = {
+          BEFORE_PROFILE_MISSING: 'Your financial profile is incomplete. Go to the Chat tab and tell FinCopilot about your income, expenses, and accounts first.',
+          AFTER_PROFILE_MISSING:  'Scenario data is not ready yet. Describe your decision in the chat on the left so FinCopilot can model the "what-if" side.',
+          UNKNOWN:                err.message,
+        };
+        setRunError({ message: friendlyMessages[err.code] ?? err.message, code: err.code });
+      } else {
+        setRunError({ message: 'Something went wrong. Please try again.', code: 'UNKNOWN' });
+      }
+    } finally {
+      setIsRunning(false);
+    }
   }
 
   return (
@@ -106,9 +123,21 @@ export function SimulationsPanel() {
             )}
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px' }}>
+            {runError && (
+              <div style={{
+                display: 'flex', gap: '10px', alignItems: 'flex-start',
+                background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
+                borderRadius: '12px', padding: '12px 14px', marginBottom: '12px',
+              }}>
+                <AlertTriangle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                <p style={{ fontSize: '13px', color: '#b91c1c', fontFamily: 'DM Sans', lineHeight: 1.6, margin: 0 }}>
+                  {runError.message}
+                </p>
+              </div>
+            )}
             {activeSimulation ? (
               <SimulationResultView simulation={activeSimulation} />
-            ) : (
+            ) : !runError && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', textAlign: 'center', padding: '24px' }}>
                 <BarChart2 size={28} style={{ color: 'var(--ink-subtle)' }} />
                 <p style={{ fontSize: '13px', color: 'var(--ink-muted)', fontFamily: 'DM Sans', lineHeight: 1.6, maxWidth: '240px' }}>

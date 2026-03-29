@@ -63,19 +63,37 @@ function apiToFrontend(sim) {
  * @param {{ prompt: string, profileBefore?: object }} params
  * @param {string} userId
  */
+/**
+ * Named error codes the UI can branch on.
+ * - BEFORE_PROFILE_MISSING: user hasn't completed onboarding chat
+ * - AFTER_PROFILE_MISSING:  user hasn't described a scenario in the simulation chat
+ * - UNKNOWN: anything else
+ */
+export class SimulationError extends Error {
+  constructor(detail, code = 'UNKNOWN') {
+    super(detail);
+    this.code = code;
+  }
+}
+
 export async function runSimulation(params, userId = 'demo_user') {
   const res = await fetch(`${API_BASE}/simulations/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       user_id:       userId,
-      scenario_name: params.prompt,
-      prompt:        params.prompt,
+      scenario_name: params.prompt || 'Scenario comparison',
+      // prompt is optional on the backend — scenario_name is used as the label
     }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Simulation failed');
+    const detail = err.detail || 'Simulation failed';
+    let code = 'UNKNOWN';
+    if (res.status === 404) {
+      code = detail.toLowerCase().includes('before') ? 'BEFORE_PROFILE_MISSING' : 'AFTER_PROFILE_MISSING';
+    }
+    throw new SimulationError(detail, code);
   }
   const sim = await res.json();
   return apiToFrontend(sim);
