@@ -40,24 +40,29 @@ export function getIssueAgentStorageKey(taskId) {
   return `${ISSUE_AGENT_STORAGE_PREFIX}${taskId}`;
 }
 
+export function createIssueAgentTaskId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `issue-agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function getLastIssueAgentTaskId() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem(ISSUE_AGENT_LAST_KEY);
 }
 
-export function getIssueAgentUrl(taskId, isDemo = false, sessionId = null) {
+export function getIssueAgentUrl(taskId, isDemo = false, sessionId = null, launching = false) {
   const params = new URLSearchParams({ taskId });
   if (sessionId) params.set('sessionId', sessionId);
   if (isDemo) params.set('demo', 'true');
+  if (launching) params.set('launching', 'true');
   return `/dashboard/browser-agent?${params.toString()}`;
 }
 
-export function buildIssueAgentTask({ issue, research }) {
+export function buildIssueAgentTask({ issue, research = null, taskId = createIssueAgentTaskId(), launching = !research }) {
   const prompt = COLLABORATION_PROMPTS[issue?.rule_id] || COLLABORATION_PROMPTS.default;
-  const taskId =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `issue-agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   return {
     taskId,
@@ -70,7 +75,8 @@ export function buildIssueAgentTask({ issue, research }) {
       explanation: issue?.explanation || '',
     },
     research,
-    state: 'running',
+    launching,
+    state: launching ? 'idle' : 'running',
     currentStepIndex: 0,
     collaborationPrompt: prompt,
     capturedAnswer: '',

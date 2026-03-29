@@ -12,12 +12,15 @@ from backend.main import app
 from backend.models.schemas import (
     ComparisonDecision,
     ComparisonProfile,
+    IssueBrowserAgentAnalysisReport,
+    IssueBrowserAgentPotentialSolution,
     IssueBrowserAgentStartResponse,
     IssueBrowserAgentStatusResponse,
 )
 from backend.services.browser_agent import (
     ASK_USER_TOOL,
     FINISH_TASK_TOOL,
+    BrowserAgentSession,
     BrowserAgentManager,
 )
 from backend.services.issue_detection import detect_issues
@@ -404,6 +407,15 @@ class IssueEndpointTests(unittest.TestCase):
                 result=None,
                 current_url="https://example.com",
                 error=None,
+                analysis_report=IssueBrowserAgentAnalysisReport(
+                    status="pending",
+                    headline="Building analysis",
+                    summary="FinCopilot is still scanning browser evidence.",
+                    key_findings=[],
+                    potential_solutions=[],
+                    recommended_next_steps=[],
+                    coverage_note="Analysis will populate after the run completes.",
+                ),
             ),
         ):
             response = self.client.get("/issues/browser-agent/status/session-123")
@@ -412,6 +424,7 @@ class IssueEndpointTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["state"], "question")
         self.assertEqual(payload["question"], "What is the best rate you found?")
+        self.assertEqual(payload["analysis_report"]["status"], "pending")
 
 
 class BrowserAgentSchemaTests(unittest.TestCase):
@@ -431,3 +444,139 @@ class BrowserAgentSchemaTests(unittest.TestCase):
         )
 
         self.assertTrue(manager._should_use_vision_fallback(error))
+
+
+class BrowserAgentAnalysisReportTests(unittest.TestCase):
+    def _session(self) -> BrowserAgentSession:
+        manager = BrowserAgentManager()
+        session = BrowserAgentSession(
+            session_id="session-123",
+            user_id="demo-user",
+            task_id="task-123",
+            research={
+                "title": "Your savings are earning very little",
+                "browser_goal": "Find better cash rates with low friction.",
+                "summary": "Compare current HISA options.",
+                "findings": [
+                    {
+                        "label": "Current rate",
+                        "value": "0.5% APY",
+                        "detail": "This leaves interest on the table.",
+                    }
+                ],
+                "steps": [
+                    {
+                        "title": "Compare rates",
+                        "action": "Open official HISA pages.",
+                        "reason": "Rates change frequently.",
+                    }
+                ],
+                "recommendations": [
+                    {
+                        "title": "Shortlist two no-fee accounts",
+                        "description": "Compare APY, fees, and transfer friction.",
+                        "expected_impact": "Higher monthly interest with minimal behavior change.",
+                    }
+                ],
+                "sources": [
+                    {"title": "Ratehub", "url": "https://www.ratehub.ca/savings-accounts/accounts/high-interest"},
+                    {"title": "Canada.ca", "url": "https://www.canada.ca/en/financial-consumer-agency.html"},
+                ],
+            },
+            analysis_report=manager._build_pending_analysis_report(
+                {
+                    "title": "Your savings are earning very little",
+                    "browser_goal": "Find better cash rates with low friction.",
+                }
+            ),
+        )
+        session.state = "done"
+        session.result = "Two current savings options stand out."
+        session.message = session.result
+        session.runtime_mode = "vision"
+        session.visited_pages = [
+            {
+                "title": "High Interest Savings Accounts",
+                "url": "https://www.ratehub.ca/savings-accounts/accounts/high-interest",
+                "domain": "www.ratehub.ca",
+                "snippet": "Compare high-interest savings accounts, rates, and account fees.",
+            },
+            {
+                "title": "Financial Consumer Agency of Canada",
+                "url": "https://www.canada.ca/en/financial-consumer-agency.html",
+                "domain": "www.canada.ca",
+                "snippet": "Official consumer guidance about bank accounts, fees, and comparing offers.",
+            },
+        ]
+        session.step_log = [
+            "Opened the first trusted page: High Interest Savings Accounts (www.ratehub.ca)",
+            "Compared APY and no-fee account details.",
+        ]
+        return session
+
+    def test_get_status_returns_pending_analysis_report(self):
+        manager = BrowserAgentManager()
+        session = self._session()
+        session.analysis_report = manager._build_pending_analysis_report(session.research)
+        manager._sessions[session.session_id] = session
+
+        status = manager.get_status(session.session_id)
+
+        self.assertEqual(status.analysis_report.status, "pending")
+        self.assertEqual(status.analysis_report.headline, "Building analysis for Your savings are earning very little")
+
+    def test_finalize_analysis_report_uses_model_output_when_evidence_is_sufficient(self):
+        manager = BrowserAgentManager()
+        session = self._session()
+
+        parsed_report = IssueBrowserAgentAnalysisReport(
+            status="ready",
+            headline="Two stronger savings options emerged",
+            summary="The scan found two materially better savings options with clearer fee terms.",
+            key_findings=[
+                "Ratehub surfaced multiple higher-yield accounts than the current setup.",
+                "The FCAC page reinforced checking fees and transfer conditions before switching.",
+            ],
+            potential_solutions=[
+                IssueBrowserAgentPotentialSolution(
+                    title="Move idle cash into a no-fee HISA",
+                    description="Pick the simplest account with a materially higher rate.",
+                    tradeoffs="Promotional rates can reset, so verify the ongoing APY.",
+                    evidence_urls=[
+                        "https://www.ratehub.ca/savings-accounts/accounts/high-interest",
+                    ],
+                )
+            ],
+            recommended_next_steps=[
+                "Compare the ongoing APY against the promotional APY.",
+                "Verify transfer timing before moving the full balance.",
+            ],
+            coverage_note=None,
+        )
+
+        with patch(
+            "backend.services.browser_agent.client.responses.parse",
+            new=AsyncMock(return_value=type("ParseResult", (), {"output_parsed": parsed_report})()),
+        ):
+            asyncio.run(manager._finalize_analysis_report(session))
+
+        self.assertEqual(session.analysis_report.status, "ready")
+        self.assertEqual(len(session.analysis_report.potential_solutions), 1)
+        self.assertEqual(
+            session.analysis_report.potential_solutions[0].evidence_urls,
+            ["https://www.ratehub.ca/savings-accounts/accounts/high-interest"],
+        )
+
+    def test_finalize_analysis_report_falls_back_to_limited_report_when_model_fails(self):
+        manager = BrowserAgentManager()
+        session = self._session()
+
+        with patch(
+            "backend.services.browser_agent.client.responses.parse",
+            new=AsyncMock(side_effect=RuntimeError("analysis model unavailable")),
+        ):
+            asyncio.run(manager._finalize_analysis_report(session))
+
+        self.assertEqual(session.analysis_report.status, "limited")
+        self.assertGreaterEqual(len(session.analysis_report.potential_solutions), 1)
+        self.assertTrue(session.analysis_report.coverage_note)

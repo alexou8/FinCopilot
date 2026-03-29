@@ -228,6 +228,23 @@ class IssueBrowserAgentVisitedPage(BaseModel):
     snippet: str | None = None
 
 
+class IssueBrowserAgentPotentialSolution(BaseModel):
+    title: str
+    description: str
+    tradeoffs: str | None = None
+    evidence_urls: list[str] = []
+
+
+class IssueBrowserAgentAnalysisReport(BaseModel):
+    status: Literal["pending", "ready", "limited"]
+    headline: str
+    summary: str
+    key_findings: list[str] = []
+    potential_solutions: list[IssueBrowserAgentPotentialSolution] = []
+    recommended_next_steps: list[str] = []
+    coverage_note: str | None = None
+
+
 class IssueBrowserAgentStatusResponse(BaseModel):
     session_id: str
     task_id: str | None = None
@@ -243,6 +260,7 @@ class IssueBrowserAgentStatusResponse(BaseModel):
     domains_analyzed: int = 0
     step_log: list[str] = []
     visited_pages: list[IssueBrowserAgentVisitedPage] = []
+    analysis_report: IssueBrowserAgentAnalysisReport | None = None
 
 
 # ── Scenarios ────────────────────────────────────────────────────────

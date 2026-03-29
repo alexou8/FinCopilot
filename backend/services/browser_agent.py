@@ -17,6 +17,8 @@ from backend.config import (
     OPENAI_BROWSER_AGENT_MODEL,
 )
 from backend.models.schemas import (
+    IssueBrowserAgentAnalysisReport,
+    IssueBrowserAgentPotentialSolution,
     IssueBrowserAgentStartRequest,
     IssueBrowserAgentStartResponse,
     IssueBrowserAgentStatusResponse,
@@ -31,6 +33,9 @@ MAX_AGENT_STEPS = 24
 MIN_ANALYZED_PAGES = 4
 MAX_VISITED_PAGE_SUMMARIES = 10
 MAX_CANDIDATE_LINKS = 10
+MAX_ANALYSIS_FINDINGS = 4
+MAX_ANALYSIS_SOLUTIONS = 3
+MAX_ANALYSIS_STEPS = 4
 
 
 ASK_USER_TOOL = {
@@ -108,6 +113,7 @@ class BrowserAgentSession:
     step_log: list[str] = field(default_factory=list)
     visited_pages: list[dict[str, str]] = field(default_factory=list)
     current_page_context: dict[str, Any] = field(default_factory=dict)
+    analysis_report: IssueBrowserAgentAnalysisReport | None = None
     pause_requested: bool = False
     stop_requested: bool = False
     action_count: int = 0
@@ -126,11 +132,13 @@ class BrowserAgentManager:
         self, req: IssueBrowserAgentStartRequest
     ) -> IssueBrowserAgentStartResponse:
         session_id = str(uuid4())
+        research_payload = req.research.model_dump(mode="json")
         session = BrowserAgentSession(
             session_id=session_id,
             user_id=req.user_id,
             task_id=req.task_id,
-            research=req.research.model_dump(mode="json"),
+            research=research_payload,
+            analysis_report=self._build_pending_analysis_report(research_payload),
         )
         self._sessions[session_id] = session
         session.runtime_task = asyncio.create_task(self._run_session(session))
@@ -163,6 +171,7 @@ class BrowserAgentManager:
             domains_analyzed=len({page["domain"] for page in session.visited_pages}),
             step_log=session.step_log[-12:],
             visited_pages=session.visited_pages[-6:],
+            analysis_report=session.analysis_report,
         )
 
     async def pause(self, session_id: str) -> IssueBrowserAgentStatusResponse:
@@ -192,6 +201,7 @@ class BrowserAgentManager:
             session.result = session.result or "The browser task was stopped before completion."
             session.message = "Browser agent stopped."
         await self._show_done(session, session.result or "Stopped.")
+        await self._finalize_analysis_report(session)
         await self._close_session(session)
         return self.get_status(session_id)
 
@@ -217,6 +227,10 @@ class BrowserAgentManager:
             session.active = False
             session.error = "No launch URL was provided for the browser task."
             session.message = session.error
+            session.analysis_report = self._build_limited_analysis_report(
+                session,
+                coverage_note="The browser task could not start because no launch URL was available.",
+            )
             return
 
         try:
@@ -236,6 +250,7 @@ class BrowserAgentManager:
             await session.page.goto(start_url, wait_until="domcontentloaded", timeout=45000)
             session.current_url = session.page.url
             await self._capture_page_context(session)
+            self._append_page_observation(session, "Opened the first trusted page")
             session.state = "running"
             session.message = "Browser agent is reading the page and planning the next step."
             await self._ensure_overlay(session)
@@ -301,6 +316,8 @@ class BrowserAgentManager:
         finally:
             if session.state in {"failed", "done"} and session.result:
                 session.message = session.result
+            if session.state in {"failed", "done"}:
+                await self._finalize_analysis_report(session)
             if session.state == "failed" or session.stop_requested:
                 await self._close_session(session)
             await self._set_overlay_state(session)
@@ -676,6 +693,257 @@ class BrowserAgentManager:
             FINISH_TASK_TOOL,
         ]
 
+    def _build_pending_analysis_report(
+        self, research: dict[str, Any]
+    ) -> IssueBrowserAgentAnalysisReport:
+        title = research.get("title") or "this issue"
+        return IssueBrowserAgentAnalysisReport(
+            status="pending",
+            headline=f"Building analysis for {title}",
+            summary=(
+                "FinCopilot is scanning trusted pages and will summarize the most practical "
+                "solutions once the browser pass is complete."
+            ),
+            key_findings=[],
+            potential_solutions=[],
+            recommended_next_steps=[],
+            coverage_note="Analysis will populate after the current browser run finishes.",
+        )
+
+    async def _finalize_analysis_report(self, session: BrowserAgentSession) -> None:
+        current = session.analysis_report
+        if current and current.status in {"ready", "limited"}:
+            return
+
+        if session.state not in {"done", "failed"}:
+            session.analysis_report = self._build_pending_analysis_report(session.research)
+            return
+
+        if not self._has_enough_evidence(session):
+            session.analysis_report = self._build_limited_analysis_report(session)
+            return
+
+        try:
+            report = await self._generate_analysis_report(session)
+            session.analysis_report = self._sanitize_analysis_report(session, report)
+        except Exception:
+            logger.exception("Failed to generate browser agent analysis report")
+            session.analysis_report = self._build_limited_analysis_report(
+                session,
+                coverage_note=(
+                    "FinCopilot gathered browser evidence, but the final analysis had to "
+                    "fall back to the guided research summary."
+                ),
+            )
+
+    async def _generate_analysis_report(
+        self, session: BrowserAgentSession
+    ) -> IssueBrowserAgentAnalysisReport:
+        response = await client.responses.parse(
+            model=OPENAI_BROWSER_AGENT_FALLBACK_MODEL,
+            instructions=(
+                "You are FinCopilot's financial browser analyst. Build a concise advisory "
+                "report from the browser evidence that was already captured. "
+                "Only cite URLs that were actually analyzed by the browser agent. "
+                "Return status `ready` when the evidence is sufficient, otherwise `limited`. "
+                "Never return `pending`. Keep recommendations practical and non-transactional."
+            ),
+            input=self._build_analysis_report_prompt(session),
+            temperature=0.1,
+            text_format=IssueBrowserAgentAnalysisReport,
+        )
+        if response.output_parsed is None:
+            raise RuntimeError("Browser agent analysis report returned no structured output.")
+        return response.output_parsed
+
+    def _build_analysis_report_prompt(self, session: BrowserAgentSession) -> str:
+        research = session.research
+        findings = "\n".join(
+            f"- {item.get('label')}: {item.get('value')} ({item.get('detail') or 'No extra detail.'})"
+            for item in (research.get("findings") or [])[:MAX_ANALYSIS_FINDINGS]
+        ) or "- No structured findings were preloaded."
+        recommendations = "\n".join(
+            f"- {item.get('title')}: {item.get('description')} "
+            f"(Impact: {item.get('expected_impact') or 'Unspecified'})"
+            for item in (research.get("recommendations") or [])[:MAX_ANALYSIS_SOLUTIONS]
+        ) or "- No guided recommendations were preloaded."
+        visited_pages = "\n".join(
+            f"- {page['title']} | {page['domain']} | {page['url']} | Snippet: {page.get('snippet') or 'No snippet.'}"
+            for page in session.visited_pages[-MAX_VISITED_PAGE_SUMMARIES:]
+        ) or "- No analyzed pages were recorded."
+        step_log = "\n".join(f"- {entry}" for entry in session.step_log[-12:]) or "- No step history."
+        available_urls = "\n".join(
+            f"- {page['url']}" for page in session.visited_pages[-MAX_VISITED_PAGE_SUMMARIES:]
+        ) or "- No analyzed URLs."
+
+        return (
+            f"Issue: {research.get('title')}\n"
+            f"Browser goal: {research.get('browser_goal')}\n"
+            f"Initial research summary: {research.get('summary')}\n"
+            f"Run state: {session.state}\n"
+            f"Runtime mode: {session.runtime_mode}\n"
+            f"Browser result: {session.result or session.message or 'No result yet.'}\n"
+            f"Pages analyzed: {len(session.visited_pages)}\n"
+            f"Domains analyzed: {len({page['domain'] for page in session.visited_pages})}\n\n"
+            "Guided findings:\n"
+            f"{findings}\n\n"
+            "Guided recommendations:\n"
+            f"{recommendations}\n\n"
+            "Visited pages:\n"
+            f"{visited_pages}\n\n"
+            "Step log:\n"
+            f"{step_log}\n\n"
+            "Allowed evidence URLs:\n"
+            f"{available_urls}\n"
+        )
+
+    def _sanitize_analysis_report(
+        self,
+        session: BrowserAgentSession,
+        report: IssueBrowserAgentAnalysisReport,
+    ) -> IssueBrowserAgentAnalysisReport:
+        allowed_urls = [page["url"] for page in session.visited_pages if page.get("url")]
+        sanitized_solutions: list[IssueBrowserAgentPotentialSolution] = []
+
+        for item in report.potential_solutions[:MAX_ANALYSIS_SOLUTIONS]:
+            evidence_urls = self._dedupe_strings(
+                [
+                    url
+                    for url in (item.evidence_urls or [])
+                    if url in allowed_urls
+                ]
+            )[:3]
+            if not evidence_urls:
+                evidence_urls = allowed_urls[:2]
+
+            sanitized_solutions.append(
+                IssueBrowserAgentPotentialSolution(
+                    title=item.title.strip() or "Potential solution",
+                    description=item.description.strip() or "Review the cited evidence before acting.",
+                    tradeoffs=(
+                        item.tradeoffs.strip()
+                        if isinstance(item.tradeoffs, str) and item.tradeoffs.strip()
+                        else "Verify current eligibility, fees, and timeline before acting."
+                    ),
+                    evidence_urls=evidence_urls,
+                )
+            )
+
+        status = "limited" if report.status == "limited" else "ready"
+        coverage_note = report.coverage_note
+        if status == "limited" and not coverage_note:
+            coverage_note = self._build_coverage_note(session)
+
+        return IssueBrowserAgentAnalysisReport(
+            status=status,
+            headline=report.headline.strip() or "Browser analysis complete",
+            summary=report.summary.strip() or (session.result or session.message or "Analysis complete."),
+            key_findings=self._dedupe_strings(report.key_findings)[:MAX_ANALYSIS_FINDINGS],
+            potential_solutions=sanitized_solutions,
+            recommended_next_steps=self._dedupe_strings(report.recommended_next_steps)[:MAX_ANALYSIS_STEPS],
+            coverage_note=coverage_note,
+        )
+
+    def _build_limited_analysis_report(
+        self,
+        session: BrowserAgentSession,
+        coverage_note: str | None = None,
+    ) -> IssueBrowserAgentAnalysisReport:
+        research = session.research
+        key_findings = [
+            f"{item.get('label')}: {item.get('value')}"
+            for item in (research.get("findings") or [])[:MAX_ANALYSIS_FINDINGS]
+            if item.get("label") and item.get("value")
+        ]
+        key_findings.extend(
+            f"Observed page: {page['title']} ({page['domain']})"
+            for page in session.visited_pages[:2]
+        )
+
+        evidence_urls = self._dedupe_strings(
+            [
+                page["url"]
+                for page in session.visited_pages
+                if page.get("url")
+            ]
+        )
+        if not evidence_urls:
+            evidence_urls = self._dedupe_strings(
+                [
+                    item.get("url", "")
+                    for item in (research.get("sources") or [])
+                    if item.get("url")
+                ]
+            )
+
+        potential_solutions = [
+            IssueBrowserAgentPotentialSolution(
+                title=item.get("title") or "Potential solution",
+                description=item.get("description") or "Review the guided research summary.",
+                tradeoffs=item.get("expected_impact")
+                or "Confirm the current details on an official page before acting.",
+                evidence_urls=evidence_urls[:2],
+            )
+            for item in (research.get("recommendations") or [])[:MAX_ANALYSIS_SOLUTIONS]
+        ]
+
+        recommended_next_steps = [
+            step.get("action") or step.get("title") or "Review the browser findings."
+            for step in (research.get("steps") or [])[:MAX_ANALYSIS_STEPS]
+            if step.get("action") or step.get("title")
+        ]
+        if session.result:
+            recommended_next_steps.insert(0, session.result)
+
+        return IssueBrowserAgentAnalysisReport(
+            status="limited",
+            headline=f"Limited browser analysis for {research.get('title') or 'this issue'}",
+            summary=(
+                f"FinCopilot reviewed {len(session.visited_pages)} page(s) across "
+                f"{len({page['domain'] for page in session.visited_pages})} domain(s). "
+                "The report below leans on the guided research brief because the browser "
+                "coverage was limited or the run ended early."
+            ),
+            key_findings=self._dedupe_strings(key_findings)[:MAX_ANALYSIS_FINDINGS],
+            potential_solutions=potential_solutions,
+            recommended_next_steps=self._dedupe_strings(recommended_next_steps)[:MAX_ANALYSIS_STEPS],
+            coverage_note=coverage_note or self._build_coverage_note(session),
+        )
+
+    def _build_coverage_note(self, session: BrowserAgentSession) -> str:
+        if session.state == "failed":
+            return (
+                "The browser run ended with a runtime issue, so FinCopilot fell back to a "
+                "limited report based on the evidence gathered before the failure."
+            )
+        if session.stop_requested:
+            return "The browser run was stopped early, so the recommendations are based on partial evidence."
+        return (
+            "The browser agent did not reach the target page coverage, so review the cited pages "
+            "before treating these recommendations as final."
+        )
+
+    def _append_page_observation(
+        self, session: BrowserAgentSession, prefix: str = "Observed page"
+    ) -> None:
+        context = session.current_page_context or {}
+        title = context.get("title") or "Page"
+        domain = context.get("domain") or urlparse(context.get("url", "")).netloc or "unknown domain"
+        entry = f"{prefix}: {title} ({domain})"
+        if not session.step_log or session.step_log[-1] != entry:
+            session.step_log.append(entry)
+
+    def _dedupe_strings(self, values: list[str] | None) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for value in values or []:
+            text = (value or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            result.append(text)
+        return result
+
     def _should_use_vision_fallback(self, exc: Exception) -> bool:
         message = str(exc).lower()
         if isinstance(exc, NotFoundError):
@@ -823,6 +1091,7 @@ class BrowserAgentManager:
         await page.wait_for_timeout(900)
         await self._ensure_overlay(session)
         await self._capture_page_context(session)
+        self._append_page_observation(session)
         await self._set_overlay_state(session)
 
     async def _wait_for_answer(self, session: BrowserAgentSession) -> str:
