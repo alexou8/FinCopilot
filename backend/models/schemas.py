@@ -44,6 +44,7 @@ class Decision(BaseModel):
 
 
 class FinancialProfile(BaseModel):
+    name: str | None = None
     income: Income | None = None
     expenses: list[Expense] | None = None
     debt: list[Debt] | None = None
@@ -101,6 +102,7 @@ class ComparisonDecision(BaseModel):
 
 
 class ComparisonProfile(BaseModel):
+    name: str | None = None
     profile_label: str | None = None
     scenario_name: str | None = None
     income_sources: list[IncomeSourceItem] | None = None

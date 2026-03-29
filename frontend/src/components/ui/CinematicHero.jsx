@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { BarChart3, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 if (typeof window !== 'undefined') {
@@ -400,7 +401,7 @@ export function CinematicHero({
                 {/* Floating badge — top left */}
                 <div className="floating-badge absolute flex top-4 lg:top-8 left-0 lg:left-[-60px] floating-ui-badge rounded-xl lg:rounded-2xl p-3 lg:p-4 items-center gap-3 z-30">
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(to bottom,rgba(0,128,128,0.2),rgba(0,128,128,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,200,150,0.2)' }}>
-                    <span style={{ fontSize: '16px' }} aria-hidden="true">📊</span>
+                    <BarChart3 size={16} style={{ color: 'rgba(0, 200, 150, 0.9)' }} aria-hidden="true" />
                   </div>
                   <div>
                     <p style={{ color: 'white', fontSize: '13px', fontWeight: 700, letterSpacing: '-0.01em', fontFamily: "'Inter',sans-serif" }}>Budget on track</p>
@@ -411,7 +412,7 @@ export function CinematicHero({
                 {/* Floating badge — bottom right */}
                 <div className="floating-badge absolute flex bottom-10 lg:bottom-14 right-0 lg:right-[-60px] floating-ui-badge rounded-xl lg:rounded-2xl p-3 lg:p-4 items-center gap-3 z-30">
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(to bottom,rgba(52,211,153,0.2),rgba(52,211,153,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(52,211,153,0.2)' }}>
-                    <span style={{ fontSize: '16px' }} aria-hidden="true">✨</span>
+                    <Sparkles size={16} style={{ color: 'rgba(52, 211, 153, 0.9)' }} aria-hidden="true" />
                   </div>
                   <div>
                     <p style={{ color: 'white', fontSize: '13px', fontWeight: 700, letterSpacing: '-0.01em', fontFamily: "'Inter',sans-serif" }}>AI Insight ready</p>

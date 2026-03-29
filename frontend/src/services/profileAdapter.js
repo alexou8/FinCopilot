@@ -72,9 +72,10 @@ export function comparisonToFrontend(cp) {
   const acctArr  = accounts.length  > 0 ? accounts : null;
 
   // Return null if nothing was extracted yet
-  if (!income && !expenses && !debtArr && !acctArr) return null;
+  if (!income && !expenses && !debtArr && !acctArr && !cp.name) return null;
 
   return {
+    name: cp.name ?? null,
     income,
     expenses,
     debt:             debtArr,
@@ -124,9 +125,10 @@ export function legacyToFrontend(fp) {
   const debtArr  = debt.length      > 0 ? debt    : null;
   const acctArr  = accounts.length  > 0 ? accounts : null;
 
-  if (!income && !expenses && !debtArr && !acctArr) return null;
+  if (!income && !expenses && !debtArr && !acctArr && !fp.name) return null;
 
   return {
+    name: fp.name ?? null,
     income,
     expenses,
     debt:             debtArr,
@@ -169,6 +171,7 @@ export function frontendToLegacy(profile) {
   }));
 
   return {
+    name: profile.name || undefined,
     income:   income                   || undefined,
     expenses: expenses.length > 0      ? expenses : undefined,
     debt:     debt.length > 0          ? debt     : undefined,

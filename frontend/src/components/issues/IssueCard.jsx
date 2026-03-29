@@ -41,7 +41,7 @@ export function IssueCard({ issue }) {
       issue.explanation ? `Context: ${issue.explanation.slice(0, 200)}` : ''
     }`;
     setTimeout(() => send(prompt), 300);
-    addToast(`💬 Asking about: ${issue.title}`);
+    addToast(`Asking about: ${issue.title}`, 'chat');
   }
 
   return (

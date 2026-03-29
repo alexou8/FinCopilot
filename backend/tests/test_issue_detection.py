@@ -264,6 +264,22 @@ class IssueEndpointTests(unittest.TestCase):
         response = self.client.post("/issues/detect", json={"user_id": "missing-user"})
         self.assertEqual(response.status_code, 404)
 
+    def test_profile_route_persists_saved_name(self):
+        response = self.client.put(
+            "/profiles/demo-user",
+            json={
+                "name": "Dev Test",
+                "income": {"amount": 1200, "frequency": "monthly", "is_variable": False},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["name"], "Dev Test")
+
+        follow_up = self.client.get("/profiles/demo-user")
+        self.assertEqual(follow_up.status_code, 200)
+        self.assertEqual(follow_up.json()["name"], "Dev Test")
+
     def test_detect_endpoint_returns_fallback_issue_cards(self):
         healthy = _healthy_profile().model_dump(mode="json")
         profile = _profile_with(
