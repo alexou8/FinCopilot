@@ -1,7 +1,7 @@
 import { demoProfile } from '../data/demoProfile';
 
 const USE_MOCK = false;
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:8000';
 
 let localProfile = { ...demoProfile };
 

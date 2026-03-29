@@ -1,7 +1,7 @@
 import { getMockResponse } from '../data/demoConversation';
 
 const USE_MOCK = false;
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:8000';
 
 export async function sendMessage(message, userId = 'demo-user') {
   if (USE_MOCK) {
@@ -11,14 +11,12 @@ export async function sendMessage(message, userId = 'demo-user') {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, message }),
+    body: JSON.stringify({ message, user_id: userId }),
   });
   if (!res.ok) throw new Error('Chat request failed');
   const data = await res.json();
-  // Map backend shape { reply, profile } → shape expected by useChat
   return {
     aiMessage: data.reply,
     profileUpdates: data.profile || {},
-    type: null,
   };
 }

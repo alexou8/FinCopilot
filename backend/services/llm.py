@@ -15,7 +15,7 @@ async def chat_completion(
     """Send a chat completion request to GPT-4o and return the assistant message content."""
     try:
         kwargs: dict = {
-            "model": "gpt-4o",
+            "model": "gpt-4.1-mini",
             "messages": messages,
             "temperature": temperature,
         }

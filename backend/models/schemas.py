@@ -134,7 +134,10 @@ class IssueDetectRequest(BaseModel):
 class Issue(BaseModel):
     rule_id: str
     severity: str
+    title: str
     explanation: str
+    action: str
+    actionType: str
 
 
 class IssueDetectResponse(BaseModel):
