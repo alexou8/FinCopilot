@@ -1,4 +1,4 @@
-import { legacyToFrontend, frontendToLegacy } from './profileAdapter';
+import { comparisonToFrontend, legacyToFrontend, frontendToLegacy } from './profileAdapter';
 
 const USE_MOCK = false;
 const API_BASE = '/api';
@@ -8,11 +8,20 @@ export async function getProfile(userId = 'demo-user') {
     await new Promise(r => setTimeout(r, 300));
     return null;
   }
+
+  // Try the comparison profile first (has decision field, richer data)
+  const rawRes = await fetch(`${API_BASE}/profiles/${encodeURIComponent(userId)}/comparison`);
+  if (rawRes.ok) {
+    const data = await rawRes.json();
+    const profile = comparisonToFrontend(data);
+    if (profile) return profile;
+  }
+
+  // Fall back to legacy endpoint
   const res = await fetch(`${API_BASE}/profiles/${encodeURIComponent(userId)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('Profile fetch failed');
   const data = await res.json();
-  // Backend returns FinancialProfile shape — translate to frontend shape
   return legacyToFrontend(data);
 }
 

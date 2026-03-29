@@ -5,11 +5,15 @@ import { BarChart2, History, CheckCircle, AlertTriangle } from 'lucide-react';
 import { SimulationHistoryCard } from './SimulationHistoryCard';
 import { SimulationResultView } from './SimulationResultView';
 import { SimulationChatPanel } from './SimulationChatPanel';
+import { SimulationLauncher } from './SimulationLauncher';
 import { useSimulations } from '../../hooks/useSimulations';
+import { useApp } from '../../context/AppContext';
 import { SimulationError } from '../../services/simulationService';
 
 export function SimulationsPanel() {
   const { simulations, activeSimulation, fetchHistory, run, remove, select } = useSimulations();
+  const { profile } = useApp();
+  const decision = profile?.decision;
   const [isRunning, setIsRunning]   = useState(false);
   const [runError, setRunError]     = useState(null); // { message, code }
   const [toast, setToast]           = useState(null);
@@ -55,9 +59,13 @@ export function SimulationsPanel() {
   return (
     <div style={{ display: 'flex', height: '100%', gap: '16px' }}>
 
-      {/* ── Left column: Scenario Chat ── */}
+      {/* ── Left column: Launcher (if decision known) or Chat (fallback) ── */}
       <div style={{ flex: '1.4 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <SimulationChatPanel onRunSimulation={handleRun} isRunning={isRunning} />
+        {decision?.description ? (
+          <SimulationLauncher decision={decision} onRunSimulation={handleRun} isRunning={isRunning} />
+        ) : (
+          <SimulationChatPanel onRunSimulation={handleRun} isRunning={isRunning} />
+        )}
       </div>
 
       {/* ── Right column: History (top) + Results (bottom) ── */}

@@ -5,11 +5,13 @@ import { ArrowRight } from 'lucide-react';
 
 const fmt = n => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(n);
 
+const fmtMo = n => (n != null ? n + ' mo' : '—');
+
 const metricDefs = [
-  { key: 'monthlySavings',      label: 'Monthly savings', format: fmt,            higherIsBetter: true  },
-  { key: 'monthsToGoal',        label: 'Months to goal',  format: n => n + ' mo', higherIsBetter: false },
-  { key: 'emergencyFundMonths', label: 'Emergency fund',  format: n => n + ' mo', higherIsBetter: true  },
-  { key: 'monthlyInterestPaid', label: 'Interest/mo',     format: fmt,            higherIsBetter: false },
+  { key: 'monthlySavings',      label: 'Monthly savings', format: fmt,   higherIsBetter: true  },
+  { key: 'monthsToGoal',        label: 'Months to goal',  format: fmtMo, higherIsBetter: false },
+  { key: 'emergencyFundMonths', label: 'Emergency fund',  format: fmtMo, higherIsBetter: true  },
+  { key: 'monthlyInterestPaid', label: 'Interest/mo',     format: fmt,   higherIsBetter: false },
 ];
 
 export function MetricComparison({ metrics }) {
@@ -19,7 +21,9 @@ export function MetricComparison({ metrics }) {
       {metricDefs.map(({ key, label, format, higherIsBetter }) => {
         const cur  = metrics.current[key];
         const scen = metrics.scenario[key];
-        const improved = higherIsBetter ? scen > cur : scen < cur;
+        const improved = (cur != null && scen != null)
+          ? (higherIsBetter ? scen > cur : scen < cur)
+          : false;
         return (
           <NeuCard key={key} className="p-4">
             <p style={{ fontSize: '11px', color: 'var(--ink-muted)', fontFamily: 'DM Sans', marginBottom: '6px' }}>{label}</p>
