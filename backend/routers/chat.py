@@ -1,13 +1,22 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from backend.models.schemas import ChatRequest, ChatResponse, ComparisonProfile
 from backend.services.llm import chat_completion
 from backend.services.extraction import extract_and_save_profile
+from backend.services.simulation_engine import build_after_profile
 from backend.prompts.onboarding import ONBOARDING_SYSTEM_PROMPT
 from backend.prompts.simulation_chat import SIMULATION_CHAT_PROMPT
-from backend.db import get_conversation_history, save_message
+from backend.db import (
+    get_conversation_history,
+    get_comparison_profile,
+    save_comparison_profile,
+    save_message,
+)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -21,6 +30,8 @@ async def chat(req: ChatRequest):
     profile_data_after. The conversation is scoped to req.user_id (which the
     frontend sets to "{real_user_id}_sim"), while profile extraction saves to
     req.profile_user_id (the real user_id).
+
+    When onboarding is complete (decision detected), auto-generates profile_data_after.
     """
     # 1. Load conversation history (scoped to user_id so sim chat is separate)
     history = await get_conversation_history(req.user_id)
@@ -54,6 +65,30 @@ async def chat(req: ChatRequest):
         profile_uid, full_conversation, req.profile_target
     )
 
-    # 7. Return reply + freshly extracted profile
+    # 7. Auto-generate profile_data_after when onboarding is complete
+    #    Triggered when: the before-profile has a decision AND no after-profile exists yet
+    if profile_data and req.profile_target == "before":
+        decision = profile_data.get("decision")
+        if decision and decision.get("description"):
+            existing_after = await get_comparison_profile(profile_uid, "after")
+            if not existing_after:
+                try:
+                    profile_before = ComparisonProfile(**profile_data)
+                    profile_after = await build_after_profile(
+                        profile_before, decision["description"]
+                    )
+                    await save_comparison_profile(
+                        profile_uid, profile_after.model_dump(), "after"
+                    )
+                    logger.info(
+                        "Auto-generated profile_data_after for user %s", profile_uid
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to auto-generate profile_data_after for user %s",
+                        profile_uid,
+                    )
+
+    # 8. Return reply + freshly extracted profile
     profile = ComparisonProfile(**profile_data) if profile_data else None
     return ChatResponse(reply=reply, profile=profile)
