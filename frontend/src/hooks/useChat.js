@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { sendMessage } from '../services/chatService';
+import { getIssues } from '../services/issuesService';
 import { demoScenario } from '../data/demoScenario';
 
 function generateId() {
@@ -10,7 +11,9 @@ function generateId() {
 }
 
 export function useChat() {
-  const { addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario } = useApp();
+  const { addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario, setIssues } = useApp();
+  // Track whether we've already fetched issues for this session to avoid repeat calls
+  const issuesFetchedRef = useRef(false);
 
   const send = useCallback(async (text) => {
     const userId = authUser?.id ?? 'demo_user';
@@ -44,6 +47,14 @@ export function useChat() {
           setProfile(prev => ({ ...(prev || {}), ...update }));
           Object.keys(update).forEach(field => updateProfileField(field));
         }
+
+        // Auto-fetch issues once onboarding is complete (decision detected)
+        if (update.decision?.description && !issuesFetchedRef.current) {
+          issuesFetchedRef.current = true;
+          getIssues(userId)
+            .then(setIssues)
+            .catch(err => console.error('Auto-fetch issues failed:', err));
+        }
       }
 
       if (response.type === 'scenario') {
@@ -61,7 +72,7 @@ export function useChat() {
     } finally {
       setIsTyping(false);
     }
-  }, [addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario]);
+  }, [addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario, setIssues]);
 
   return { send };
 }

@@ -11,9 +11,10 @@ export function IssuesPanel() {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Fetch issues whenever authUser becomes available (Supabase auth is async)
+  // Fetch issues whenever authUser becomes available (Supabase auth is async),
+  // but skip if issues were already auto-fetched after onboarding completion.
   useEffect(() => {
-    if (isDemo || !authUser?.id) return;
+    if (isDemo || !authUser?.id || issues.length > 0) return;
     setLoading(true);
     setFetchError(null);
     getIssues(authUser.id)

@@ -7,8 +7,9 @@ import { MessageInput } from '../chat/MessageInput';
 import { TypingIndicator } from '../chat/TypingIndicator';
 import { NeuButton } from '../shared/NeuButton';
 import { useSimulationChat } from '../../hooks/useSimulationChat';
+import { useApp } from '../../context/AppContext';
 
-const EXAMPLE_PROMPTS = [
+const DEFAULT_PROMPTS = [
   'Should I move out next semester?',
   'Can I afford an unpaid internship?',
   'What if I buy a car?',
@@ -17,6 +18,13 @@ const EXAMPLE_PROMPTS = [
 
 export function SimulationChatPanel({ onRunSimulation, isRunning }) {
   const { simMessages, isSimTyping, send, scenarioPrompt } = useSimulationChat();
+  const { profile } = useApp();
+
+  // If onboarding captured a decision, surface it as the first suggested prompt
+  const decisionDescription = profile?.decision?.description;
+  const examplePrompts = decisionDescription
+    ? [decisionDescription, ...DEFAULT_PROMPTS.filter(p => p.toLowerCase() !== decisionDescription.toLowerCase()).slice(0, 3)]
+    : DEFAULT_PROMPTS;
   const bottomRef = useRef(null);
   const hasMessages = simMessages.length > 0;
 
@@ -59,7 +67,7 @@ export function SimulationChatPanel({ onRunSimulation, isRunning }) {
               Tell me about the financial decision you're considering. I'll ask a few questions to understand the impact, then you can run the simulation.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {EXAMPLE_PROMPTS.map(ex => (
+              {examplePrompts.map(ex => (
                 <button
                   key={ex}
                   onClick={() => send(ex)}

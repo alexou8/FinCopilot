@@ -79,6 +79,7 @@ export function comparisonToFrontend(cp) {
     expenses,
     debt:             debtArr,
     accounts:         acctArr,
+    decision:         cp.decision ?? null,
     completionPercent: computeCompletion(!!income, !!expenses, !!debtArr, !!acctArr),
   };
 }
