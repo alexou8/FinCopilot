@@ -1,5 +1,5 @@
 import logging
-from backend.config import SUPABASE_URL, SUPABASE_KEY
+from backend.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
 from backend.models.schemas import ComparisonProfile, FinancialProfile
 from backend.services.profile_translation import comparison_to_legacy, legacy_to_comparison
 
@@ -13,7 +13,7 @@ _profiles: dict[str, dict] = {}
 
 try:
     from supabase import create_client, Client
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     # Quick connectivity check
     supabase.table("conversations").select("id").limit(1).execute()
     logger.info("Connected to Supabase")
