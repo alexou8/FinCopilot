@@ -206,7 +206,7 @@ class ScenarioExplainResponse(BaseModel):
 class RunSimulationRequest(BaseModel):
     user_id: str
     scenario_name: str   # e.g. "Can I afford to move out?"
-    prompt: str          # natural language description of the change
+    prompt: str | None = None
 
 
 class MonthlyNetWorthPoint(BaseModel):
