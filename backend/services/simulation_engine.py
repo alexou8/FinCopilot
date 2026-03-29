@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 from backend.models.schemas import (
     ComparisonProfile,
@@ -75,9 +76,19 @@ def project_monthly_balances(
     months: int = 12,
 ) -> list[dict]:
     """Project monthly liquid balances, debt totals, and net worth."""
-    accounts = profile.accounts or []
+    accounts = list(profile.accounts or [])
     debts = profile.debts or []
     outliers = profile.outliers or []
+
+    if not accounts:
+        accounts = [
+            SimpleNamespace(
+                name="Cash Buffer",
+                type="cash",
+                balance=0.0,
+                interest_rate=0.0,
+            )
+        ]
 
     # Mutable state — treat None balances as 0 so the engine always gets a float
     account_balances: dict[str, float] = {a.name: (a.balance or 0.0) for a in accounts}

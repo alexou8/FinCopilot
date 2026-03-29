@@ -26,6 +26,7 @@ export function useSimulationChat() {
   const simConvId = `${userId}_sim`;
 
   const send = useCallback(async (text) => {
+    const resetSession = simMessages.length === 0;
     const userMsg = {
       id: generateId(),
       role: 'user',
@@ -42,6 +43,7 @@ export function useSimulationChat() {
         'after',        // profile_target → saves to profile_data_after
         'simulation',   // chat_mode → uses SIMULATION_CHAT_PROMPT
         userId,         // profile_user_id → extracts profile for real userId
+        resetSession,   // first message of a scenario clears stale sim state
       );
       setSimMessages(prev => [...prev, {
         id: generateId(),
@@ -60,10 +62,13 @@ export function useSimulationChat() {
     } finally {
       setIsSimTyping(false);
     }
-  }, [userId, simConvId]);
+  }, [simMessages.length, userId, simConvId]);
 
-  // The first user message is used as the scenario name/prompt when running the simulation
-  const scenarioPrompt = simMessages.find(m => m.role === 'user')?.content ?? '';
+  const scenarioPrompt = simMessages
+    .filter(message => message.role === 'user')
+    .map(message => message.content.trim())
+    .filter(Boolean)
+    .join(' ');
 
   const clearSimChat = useCallback(() => setSimMessages([]), []);
 

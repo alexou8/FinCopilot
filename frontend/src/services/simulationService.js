@@ -7,13 +7,10 @@ const API_BASE = '/api';
  * Map a raw SimulationRecord from the backend into the shape expected by the
  * frontend components (SimulationResultView, SimulationHistoryCard, ComparisonChart).
  */
-/**
- * Compute months-to-goal: how many months of saving at `surplus` to reach `targetAmount`.
- * Returns null if surplus <= 0 or no target is set.
- */
-function computeMonthsToGoal(surplus, targetAmount) {
+function computeMonthsToGoal(surplus, targetAmount, currentSavings = 0) {
   if (!targetAmount || surplus <= 0) return null;
-  return Math.ceil(targetAmount / surplus);
+  const remaining = Math.max(targetAmount - currentSavings, 0);
+  return remaining === 0 ? 0 : Math.ceil(remaining / surplus);
 }
 
 /**
@@ -25,15 +22,27 @@ function computeEmergencyFundMonths(accountTotal, monthlyExpenses) {
   return Math.round((accountTotal / monthlyExpenses) * 10) / 10;
 }
 
+function computeMonthlyInterestPaid(profile) {
+  const debts = profile?.debts || [];
+  const monthlyInterest = debts.reduce((total, debt) => {
+    const balance = Number(debt?.balance || 0);
+    const rate = Number(debt?.interest_rate || 0);
+    return total + (balance * rate) / 100 / 12;
+  }, 0);
+  return Math.round(monthlyInterest);
+}
+
 function apiToFrontend(sim) {
   const before = sim.monthly_net_worth_before || [];
   const after  = sim.monthly_net_worth_after  || [];
   const rec    = sim.recommendation || {};
   const sb     = sim.summary_before || {};
   const sa     = sim.summary_after  || {};
+  const profileBefore = sim.profile_data_before || {};
+  const profileAfter = sim.profile_data_after || {};
 
   // Extract decision target from the before-profile (if available)
-  const decision = sim.profile_data_before?.decision;
+  const decision = profileBefore?.decision;
   const targetAmount = decision?.target_amount ?? null;
 
   const trajectories = before.map((b, i) => ({
@@ -60,15 +69,15 @@ function apiToFrontend(sim) {
     metrics: {
       current: {
         monthlySavings:      sb.monthly_surplus   ?? 0,
-        monthsToGoal:        computeMonthsToGoal(sb.monthly_surplus, targetAmount),
+        monthsToGoal:        computeMonthsToGoal(sb.monthly_surplus, targetAmount, sb.account_total ?? 0),
         emergencyFundMonths: computeEmergencyFundMonths(sb.account_total ?? 0, sb.monthly_expenses ?? 0),
-        monthlyInterestPaid: 0,
+        monthlyInterestPaid: computeMonthlyInterestPaid(profileBefore),
       },
       scenario: {
         monthlySavings:      sa.monthly_surplus   ?? 0,
-        monthsToGoal:        computeMonthsToGoal(sa.monthly_surplus, targetAmount),
+        monthsToGoal:        computeMonthsToGoal(sa.monthly_surplus, targetAmount, sa.account_total ?? 0),
         emergencyFundMonths: computeEmergencyFundMonths(sa.account_total ?? 0, sa.monthly_expenses ?? 0),
-        monthlyInterestPaid: 0,
+        monthlyInterestPaid: computeMonthlyInterestPaid(profileAfter),
       },
     },
     trajectories,

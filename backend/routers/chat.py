@@ -10,6 +10,8 @@ from backend.services.simulation_engine import build_after_profile
 from backend.prompts.onboarding import ONBOARDING_SYSTEM_PROMPT
 from backend.prompts.simulation_chat import SIMULATION_CHAT_PROMPT
 from backend.db import (
+    clear_comparison_profile,
+    clear_conversation_history,
     get_conversation_history,
     get_comparison_profile,
     save_comparison_profile,
@@ -41,6 +43,12 @@ async def chat(req: ChatRequest):
 
     When onboarding is complete (decision detected), auto-generates profile_data_after.
     """
+    profile_uid = req.profile_user_id or req.user_id
+
+    if req.chat_mode == "simulation" and req.reset_session:
+        await clear_conversation_history(req.user_id)
+        await clear_comparison_profile(profile_uid, "after")
+
     # 1. Load conversation history (scoped to user_id so sim chat is separate)
     history = await get_conversation_history(req.user_id)
 
@@ -49,7 +57,6 @@ async def chat(req: ChatRequest):
         system_prompt = SIMULATION_CHAT_PROMPT
         # Inject the user's current financial profile so the simulation LLM
         # knows their situation from onboarding without re-asking.
-        profile_uid = req.profile_user_id or req.user_id
         before_profile = await get_comparison_profile(profile_uid, "before")
         if before_profile:
             profile_summary = json.dumps(before_profile, indent=2)
@@ -88,7 +95,6 @@ async def chat(req: ChatRequest):
     await save_message(req.user_id, "assistant", reply)
 
     # 6. Run extraction inline — save profile under the real user_id
-    profile_uid = req.profile_user_id or req.user_id
     full_conversation = [
         *history,
         {"role": "user", "content": req.message},
