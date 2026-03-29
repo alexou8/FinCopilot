@@ -26,12 +26,19 @@ export async function sendMessage(
   profileTarget = 'before',
   chatMode = 'onboarding',
   profileUserId = null,
+  resetSession = false,
 ) {
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 800 + Math.random() * 400));
     return getMockResponse(message);
   }
-  const body = { message, user_id: userId, profile_target: profileTarget, chat_mode: chatMode };
+  const body = {
+    message,
+    user_id: userId,
+    profile_target: profileTarget,
+    chat_mode: chatMode,
+    reset_session: resetSession,
+  };
   if (profileUserId) body.profile_user_id = profileUserId;
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',

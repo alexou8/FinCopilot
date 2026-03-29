@@ -17,7 +17,7 @@ const DEFAULT_PROMPTS = [
 ];
 
 export function SimulationChatPanel({ onRunSimulation, isRunning }) {
-  const { simMessages, isSimTyping, send, scenarioPrompt } = useSimulationChat();
+  const { simMessages, isSimTyping, send, scenarioPrompt, clearSimChat } = useSimulationChat();
   const { profile } = useApp();
 
   const decisionDescription = profile?.decision?.description;
@@ -132,7 +132,10 @@ export function SimulationChatPanel({ onRunSimulation, isRunning }) {
         <NeuButton
           variant="primary"
           size="md"
-          onClick={() => onRunSimulation(scenarioPrompt)}
+          onClick={async () => {
+            const result = await onRunSimulation(scenarioPrompt);
+            if (result) clearSimChat();
+          }}
           disabled={isRunning || !hasMessages}
           style={{ width: '100%', gap: '8px' }}
         >

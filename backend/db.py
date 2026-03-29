@@ -48,6 +48,14 @@ async def save_message(user_id: str, role: str, content: str) -> None:
     ).execute()
 
 
+async def clear_conversation_history(user_id: str) -> None:
+    """Delete all stored chat messages for a user/session."""
+    if _use_memory:
+        _conversations.pop(user_id, None)
+        return
+    supabase.table("conversations").delete().eq("user_id", user_id).execute()
+
+
 async def get_profile(user_id: str) -> dict | None:
     """Fetch the legacy financial profile for a user."""
     if _use_memory:
@@ -153,6 +161,17 @@ async def save_comparison_profile(
         supabase.table("financial_profiles").update(payload).eq("user_id", user_id).execute()
         return
     supabase.table("financial_profiles").insert({"user_id": user_id, **payload}).execute()
+
+
+async def clear_comparison_profile(user_id: str, target_profile: str = "before") -> None:
+    """Clear the requested comparison profile slot without deleting the row."""
+    column = "profile_data_after" if target_profile == "after" else "profile_data_before"
+    if _use_memory:
+        stored = _profiles.get(user_id)
+        if stored:
+            stored.pop(column, None)
+        return
+    supabase.table("financial_profiles").update({column: None}).eq("user_id", user_id).execute()
 
 
 # ── Simulations ───────────────────────────────────────────────────────

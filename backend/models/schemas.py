@@ -122,6 +122,7 @@ class ChatRequest(BaseModel):
     profile_target: Literal["before", "after"] = "before"
     chat_mode: Literal["onboarding", "simulation"] = "onboarding"
     profile_user_id: str | None = None  # real user_id for profile extraction (defaults to user_id)
+    reset_session: bool = False
 
 
 class ChatResponse(BaseModel):
