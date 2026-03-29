@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from backend.db import get_profile_raw, get_simulations, save_simulation, delete_simulation
+from backend.db import get_profile_raw, get_comparison_profile, get_simulations, save_simulation, delete_simulation
 from backend.models.schemas import (
     ComparisonProfile,
     RunSimulationRequest,
@@ -52,8 +52,16 @@ async def run_simulation(req: RunSimulationRequest):
         logger.exception("Invalid profile_before for user %s", req.user_id)
         raise HTTPException(status_code=422, detail=f"Profile data is malformed: {exc}") from exc
 
-    # 2. Build after-profile via AI
-    profile_after = await build_after_profile(profile_before, req.prompt)
+    # 2. Use stored profile_after from simulation chat if available; otherwise AI-generate
+    raw_after = await get_comparison_profile(req.user_id, "after")
+    if raw_after:
+        try:
+            profile_after = ComparisonProfile(**raw_after)
+        except Exception:
+            logger.warning("Stored profile_after is malformed for user %s — falling back to AI generation", req.user_id)
+            profile_after = await build_after_profile(profile_before, req.prompt)
+    else:
+        profile_after = await build_after_profile(profile_before, req.prompt)
 
     # 3. Compute trajectories (12 months)
     MONTHS = 12
