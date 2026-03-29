@@ -140,6 +140,8 @@ class Issue(BaseModel):
     explanation: str
     action: str
     actionType: str
+    metrics: dict[str, float | int | str | bool | None] | None = None
+    reasons: list[str] | None = None
 
 
 class IssueDetectResponse(BaseModel):
