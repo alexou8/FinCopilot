@@ -5,6 +5,7 @@ import { User, Mail, Lock, Plus, Trash2, Pencil, Check, X, TrendingUp } from 'lu
 import { useApp } from '../../context/AppContext';
 import { NeuButton } from '../shared/NeuButton';
 import { NeuProgressBar } from '../shared/NeuProgressBar';
+import { updateProfile } from '../../services/profileService';
 
 const FONT = 'DM Sans, sans-serif';
 const MONO = 'JetBrains Mono, monospace';
@@ -121,7 +122,7 @@ function AccountTab({ profile, authUser }) {
       </div>
 
       {/* Account details */}
-      <div className="neu-inset-sm" style={{ borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div className="neu-inset-sm" style={{ borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Email */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -430,12 +431,14 @@ function AccountsSection({ accounts, onChange }) {
 // ─── Finances tab ─────────────────────────────────────────────────────────────
 
 function FinancesTab({ profile }) {
-  const { setProfile } = useApp();
+  const { setProfile, authUser } = useApp();
 
   const update = useCallback((section, data) => {
-    setProfile(prev => ({ ...prev, [section]: data }));
-    // TODO: Save to Supabase: supabase.from('financial_profiles').upsert({ user_id, [section]: data })
-  }, [setProfile]);
+    const updated = { ...profile, [section]: data };
+    setProfile(updated);
+    const userId = authUser?.id ?? 'demo_user';
+    updateProfile(userId, updated).catch(err => console.error('Profile save failed:', err));
+  }, [setProfile, profile, authUser]);
 
   if (!profile) return (
     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--ink-muted)', fontFamily: FONT }}>

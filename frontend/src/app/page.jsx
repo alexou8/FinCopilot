@@ -36,45 +36,26 @@ export default function LandingPage() {
           </span>
         </Link>
 
-        {/* Auth buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Link
-            href="/login"
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: 'rgba(255,255,255,0.72)',
-              textDecoration: 'none',
-              padding: '8px 18px',
-              borderRadius: '12px',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
-            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.72)'}
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/login"
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: '#ffffff',
-              textDecoration: 'none',
-              padding: '9px 20px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #009090, #004444)',
-              boxShadow: '0 2px 12px rgba(0,144,144,0.35)',
-              transition: 'opacity 0.15s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-          >
-            Get started
-          </Link>
-        </div>
+        {/* Auth button */}
+        <Link
+          href="/login"
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: '#ffffff',
+            textDecoration: 'none',
+            padding: '9px 20px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #009090, #004444)',
+            boxShadow: '0 2px 12px rgba(0,144,144,0.35)',
+            transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+        >
+          Get started
+        </Link>
       </nav>
 
       <CinematicHero />

@@ -27,9 +27,9 @@ function Layout() {
         display: 'flex',
         height: '100dvh',
         width: '100vw',
-        padding: '20px',
+        padding: '16px',
         gap: '16px',
-        overflow: 'hidden',
+        overflow: 'clip',
         background: 'var(--surface)',
       }}
     >
@@ -66,7 +66,7 @@ function Layout() {
             </div>
           )}
 
-          {/* Profile: full-width editable view */}
+          {/* Profile: centred, max-width to keep it readable */}
           {showProfile && (
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <ProfileSidebar />

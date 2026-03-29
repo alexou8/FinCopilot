@@ -1,8 +1,10 @@
 'use client';
 
 import { MessageSquare, AlertTriangle, BarChart2, User, HelpCircle, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { FinCopilotLogo } from '../shared/FinCopilotLogo';
+import { signOut } from '../../services/authService';
 
 const NAV_ITEMS = [
   { id: 'chat',        icon: MessageSquare, label: 'Chat'        },
@@ -15,12 +17,18 @@ const FONT = "'Inter', 'DM Sans', sans-serif";
 
 export function NavSidebar() {
   const { activeNav, setActiveNav, profile, authUser } = useApp();
+  const router = useRouter();
 
   const fullName = authUser?.name || profile?.name || 'Guest';
   const email    = authUser?.email || 'Demo mode';
 
   function handleNav(id) {
     setActiveNav(id);
+  }
+
+  async function handleSignOut() {
+    await signOut();
+    router.push('/login');
   }
 
   return (
@@ -31,7 +39,7 @@ export function NavSidebar() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        padding: '20px 12px',
+        padding: '20px 14px',
         gap: '2px',
         flexShrink: 0,
       }}
@@ -168,6 +176,7 @@ export function NavSidebar() {
         </div>
         <button
           title="Sign out"
+          onClick={handleSignOut}
           style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px', flexShrink: 0 }}
           onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; }}
           onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; }}

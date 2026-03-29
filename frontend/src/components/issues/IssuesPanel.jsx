@@ -1,11 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IssueCard } from './IssueCard';
+import { getIssues } from '../../services/issuesService';
 
 export function IssuesPanel() {
-  const { issues } = useApp();
+  const { issues, setIssues, profile, authUser, isDemo } = useApp();
+
+  // Fetch issues from backend whenever this panel mounts (user navigates to Issues tab)
+  useEffect(() => {
+    if (isDemo || !profile) return;
+    const userId = authUser?.id ?? 'demo_user';
+    getIssues(userId).then(setIssues).catch(console.error);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const critical = issues.filter(i => i.severity === 'critical');
   const warnings  = issues.filter(i => i.severity === 'warning');
   const tips      = issues.filter(i => i.severity === 'tip');
