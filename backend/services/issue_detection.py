@@ -7,6 +7,35 @@ from backend.prompts.explanation import ISSUE_EXPLANATION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# Display metadata for each rule — title + action shown in the Issues panel
+_RULE_META: dict[str, dict] = {
+    "debt_vs_savings": {
+        "title": "Credit card interest exceeds savings earnings",
+        "action": "See payoff plan",
+        "actionType": "scenario",
+    },
+    "no_interest_savings": {
+        "title": "Savings account earning near-zero interest",
+        "action": "Compare TFSA & HISA options",
+        "actionType": "advice",
+    },
+    "low_emergency_buffer": {
+        "title": "Emergency fund covers less than 1 month of expenses",
+        "action": "Build emergency fund plan",
+        "actionType": "advice",
+    },
+    "spending_exceeds_income": {
+        "title": "Monthly spending exceeds income",
+        "action": "Review budget",
+        "actionType": "advice",
+    },
+    "unrealistic_goal": {
+        "title": "Move-out goal timeline is unrealistic at current savings rate",
+        "action": "Run move-out scenario",
+        "actionType": "scenario",
+    },
+}
+
 
 def _normalize_monthly(amount: float, frequency: str) -> float:
     """Convert an amount to monthly based on its frequency."""
@@ -124,11 +153,15 @@ async def explain_issues(issues: list[dict], profile: FinancialProfile) -> list[
     result: list[Issue] = []
     for issue in issues:
         rid = issue["rule_id"]
+        meta = _RULE_META.get(rid, {})
         result.append(
             Issue(
                 rule_id=rid,
                 severity=issue["severity"],
+                title=meta.get("title", rid.replace("_", " ").title()),
                 explanation=explanations.get(rid, "Unable to generate explanation."),
+                action=meta.get("action", "Learn more"),
+                actionType=meta.get("actionType", "advice"),
             )
         )
     return result
