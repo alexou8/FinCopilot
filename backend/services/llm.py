@@ -1,6 +1,6 @@
 import logging
 from openai import AsyncOpenAI
-from backend.config import OPENAI_API_KEY
+from backend.config import OPENAI_API_KEY, OPENAI_DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ async def chat_completion(
     """Send a chat completion request to GPT-5.4-mini and return the assistant message content."""
     try:
         kwargs: dict = {
-            "model": "gpt-5.4-mini",
+            "model": OPENAI_DEFAULT_MODEL,
             "messages": messages,
             "temperature": temperature,
         }

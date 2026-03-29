@@ -5,6 +5,7 @@ import logging
 from typing import Any
 from urllib.parse import quote_plus, urlparse
 
+from backend.config import OPENAI_DEFAULT_MODEL
 from backend.models.schemas import (
     ComparisonProfile,
     IssueResearchFinding,
@@ -397,7 +398,7 @@ async def build_issue_research(
 
     try:
         response = await client.responses.parse(
-            model="gpt-4.1-mini",
+            model=OPENAI_DEFAULT_MODEL,
             instructions=instructions,
             input=json.dumps(prompt, indent=2),
             temperature=0.2,

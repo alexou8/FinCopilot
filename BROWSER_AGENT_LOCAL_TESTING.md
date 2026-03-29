@@ -11,7 +11,7 @@ To test it locally, you need:
 - An OpenAI API key
 - Access to at least one browser-agent-capable model path:
   - preferred: `computer-use-preview`
-  - fallback: `gpt-4.1-mini` or whatever you set in `OPENAI_BROWSER_AGENT_FALLBACK_MODEL`
+  - fallback: `gpt-5.4-mini` or whatever you set in `OPENAI_BROWSER_AGENT_FALLBACK_MODEL`
 - Playwright's Chromium browser installed locally
 - Supabase configured for auth and profile storage
 
@@ -49,8 +49,9 @@ Create `backend/.env` with at least:
 
 ```env
 OPENAI_API_KEY=...
+OPENAI_DEFAULT_MODEL=gpt-5.4-mini
 OPENAI_BROWSER_AGENT_MODEL=computer-use-preview
-OPENAI_BROWSER_AGENT_FALLBACK_MODEL=gpt-4.1-mini
+OPENAI_BROWSER_AGENT_FALLBACK_MODEL=gpt-5.4-mini
 SUPABASE_URL=...
 SUPABASE_KEY=...
 SUPABASE_SERVICE_KEY=...

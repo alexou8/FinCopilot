@@ -7,10 +7,11 @@ _env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(_env_path)
 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_DEFAULT_MODEL: str = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5.4-mini")
 OPENAI_BROWSER_AGENT_MODEL: str = os.getenv("OPENAI_BROWSER_AGENT_MODEL", "computer-use-preview")
 OPENAI_BROWSER_AGENT_FALLBACK_MODEL: str = os.getenv(
     "OPENAI_BROWSER_AGENT_FALLBACK_MODEL",
-    "gpt-4.1-mini",
+    OPENAI_DEFAULT_MODEL,
 )
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")  # anon/public key (used by frontend auth)
