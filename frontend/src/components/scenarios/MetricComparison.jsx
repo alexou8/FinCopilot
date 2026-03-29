@@ -7,8 +7,6 @@ const fmt = n => new Intl.NumberFormat('en-CA', { style: 'currency', currency: '
 
 const metricDefs = [
   { key: 'monthlySavings',      label: 'Monthly savings', format: fmt,            higherIsBetter: true  },
-  { key: 'monthsToGoal',        label: 'Months to goal',  format: n => n + ' mo', higherIsBetter: false },
-  { key: 'emergencyFundMonths', label: 'Emergency fund',  format: n => n + ' mo', higherIsBetter: true  },
   { key: 'monthlyInterestPaid', label: 'Interest/mo',     format: fmt,            higherIsBetter: false },
 ];
 

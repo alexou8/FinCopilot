@@ -166,6 +166,51 @@ class SimulationExtractionTests(unittest.TestCase):
         transit = next(item for item in merged["recurring_expenses"] if item["name"] == "Transit")
         self.assertEqual(transit["amount"], 0.0)
 
+    def test_after_extraction_normalizes_every_two_months_and_month_names(self):
+        user_id = "cadence-user"
+        asyncio.run(db.save_comparison_profile(user_id, _before_profile(), "before"))
+
+        extracted_after = {
+            "name": None,
+            "profile_label": "after",
+            "scenario_name": "September move-out",
+            "income_sources": [
+                {"name": "Parents", "type": "gift", "amount": 500.0, "frequency": "biweekly"},
+            ],
+            "debts": [],
+            "recurring_expenses": [],
+            "outliers": [
+                {"name": "Moving expense", "kind": "expense", "amount": 300.0, "month": "September"},
+            ],
+            "accounts": [],
+            "dashboard_summary": {
+                "monthly_income": 0.0,
+                "monthly_surplus": 0.0,
+                "debt_total": 0.0,
+                "account_total": 0.0,
+            },
+            "decision": None,
+        }
+
+        conversation = [
+            {
+                "role": "user",
+                "content": "My parents would send me $500 every two months and I would have a one-time $300 moving expense in September.",
+            }
+        ]
+
+        with patch(
+            "backend.services.extraction.chat_completion",
+            new=AsyncMock(return_value=json.dumps(extracted_after)),
+        ):
+            merged = asyncio.run(extract_and_save_profile(user_id, conversation, "after"))
+
+        parents = next(item for item in merged["income_sources"] if item["name"] == "Parents")
+        self.assertEqual(parents["frequency"], "monthly")
+        self.assertEqual(parents["amount"], 250.0)
+        moving = next(item for item in merged["outliers"] if item["name"] == "Moving expense")
+        self.assertRegex(moving["month"], r"^\d{4}-\d{2}$")
+
 
 class SimulationResetSessionTests(unittest.TestCase):
     def setUp(self):
