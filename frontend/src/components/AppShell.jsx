@@ -7,6 +7,7 @@ import { IssuesPanel } from './issues/IssuesPanel';
 import { SimulationsPanel } from './simulations/SimulationsPanel';
 import { NavSidebar } from './nav/NavSidebar';
 import { TopBar } from './nav/TopBar';
+import { ToastContainer } from './shared/Toast';
 
 function Layout() {
   const { activeNav } = useApp();
@@ -83,6 +84,7 @@ export function AppShell({ isDemo = false }) {
   return (
     <AppProvider isDemo={isDemo}>
       <Layout />
+      <ToastContainer />
     </AppProvider>
   );
 }

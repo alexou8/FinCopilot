@@ -10,8 +10,20 @@ function generateId() {
   return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+const FIELD_TOAST_MAP = {
+  income:   '💰 Income updated',
+  expenses: '📊 Expenses recorded',
+  debt:     '💳 Debt info captured',
+  accounts: '🏦 Accounts linked',
+  decision: '🎯 Goal detected',
+};
+
 export function useChat() {
-  const { addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario, setIssues } = useApp();
+  const {
+    addMessage, setIsTyping, setProfile, updateProfileField,
+    authUser, setActivePanel, setScenario, setIssues,
+    addToast, setActiveNav,
+  } = useApp();
   // Track whether we've already fetched issues for this session to avoid repeat calls
   const issuesFetchedRef = useRef(false);
 
@@ -45,14 +57,27 @@ export function useChat() {
         );
         if (Object.keys(update).length > 0) {
           setProfile(prev => ({ ...(prev || {}), ...update }));
-          Object.keys(update).forEach(field => updateProfileField(field));
+          Object.keys(update).forEach(field => {
+            updateProfileField(field);
+            // Toast notification for each captured field
+            if (FIELD_TOAST_MAP[field]) {
+              addToast(FIELD_TOAST_MAP[field]);
+            }
+          });
         }
 
         // Auto-fetch issues once onboarding is complete (decision detected)
         if (update.decision?.description && !issuesFetchedRef.current) {
           issuesFetchedRef.current = true;
           getIssues(userId)
-            .then(setIssues)
+            .then(issues => {
+              setIssues(issues);
+              // Show completion toast and auto-navigate to Issues tab
+              addToast(`✨ Profile complete! ${issues.length} issue${issues.length !== 1 ? 's' : ''} found`);
+              setTimeout(() => {
+                setActiveNav('issues');
+              }, 1500);
+            })
             .catch(err => console.error('Auto-fetch issues failed:', err));
         }
       }
@@ -72,7 +97,8 @@ export function useChat() {
     } finally {
       setIsTyping(false);
     }
-  }, [addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario, setIssues]);
+  }, [addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario, setIssues, addToast, setActiveNav]);
 
   return { send };
 }
+

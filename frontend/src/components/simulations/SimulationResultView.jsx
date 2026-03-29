@@ -4,6 +4,7 @@ import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { ComparisonChart } from '../scenarios/ComparisonChart';
 import { MetricComparison } from '../scenarios/MetricComparison';
 import { VerdictCard } from '../scenarios/VerdictCard';
+import { useApp } from '../../context/AppContext';
 
 function VerdictBadge({ feasible }) {
   if (feasible === true)
@@ -26,8 +27,12 @@ function VerdictBadge({ feasible }) {
 }
 
 export function SimulationResultView({ simulation }) {
+  const { profile } = useApp();
   if (!simulation) return null;
   const { prompt, scenarios, verdict, metrics, trajectories } = simulation;
+  // Prefer the simulation-specific targetAmount (from the run's profile_data_before),
+  // then fall back to global profile context
+  const goalAmount = simulation.targetAmount ?? profile?.decision?.target_amount ?? profile?.goal?.targetAmount ?? null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -52,7 +57,7 @@ export function SimulationResultView({ simulation }) {
       </div>
 
       {/* Chart */}
-      {trajectories && <ComparisonChart trajectories={trajectories} />}
+      {trajectories && <ComparisonChart trajectories={trajectories} goalAmount={goalAmount} />}
 
       {/* Metrics */}
       {metrics && <MetricComparison metrics={metrics} />}

@@ -4,16 +4,22 @@ import { NeuCard } from '../shared/NeuCard';
 import { NeuBadge } from '../shared/NeuBadge';
 import { NeuButton } from '../shared/NeuButton';
 import { useApp } from '../../context/AppContext';
+import { useChat } from '../../hooks/useChat';
 
 export function IssueCard({ issue }) {
-  const { setActiveNav } = useApp();
+  const { setActiveNav, addToast } = useApp();
+  const { send } = useChat();
 
   function handleAction() {
     if (issue.actionType === 'scenario') {
       setActiveNav('simulations');
     } else {
-      // advice-type: open chat so the user can ask follow-up questions
+      // advice-type: navigate to chat and send a contextual question
       setActiveNav('chat');
+      const prompt = `Help me with this issue: "${issue.title}". ${issue.explanation ? 'Context: ' + issue.explanation.slice(0, 200) : ''}`;
+      // Small delay so tab switch renders first
+      setTimeout(() => send(prompt), 300);
+      addToast(`💬 Asking about: ${issue.title}`);
     }
   }
 
@@ -34,3 +40,4 @@ export function IssueCard({ issue }) {
     </NeuCard>
   );
 }
+

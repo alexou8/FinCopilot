@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquare, AlertTriangle, BarChart2, User, HelpCircle, LogOut } from 'lucide-react';
+import { MessageSquare, AlertTriangle, BarChart2, User, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { FinCopilotLogo } from '../shared/FinCopilotLogo';
@@ -16,7 +16,7 @@ const NAV_ITEMS = [
 const FONT = "'Inter', 'DM Sans', sans-serif";
 
 export function NavSidebar() {
-  const { activeNav, setActiveNav, profile, authUser } = useApp();
+  const { activeNav, setActiveNav, profile, authUser, issues, simulations } = useApp();
   const router = useRouter();
 
   const fullName = authUser?.name || profile?.name || 'Guest';
@@ -59,6 +59,10 @@ export function NavSidebar() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
         {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
           const isActive = activeNav === id;
+          const showBadge =
+            (id === 'issues' && issues.length > 0 && activeNav !== 'issues') ||
+            (id === 'simulations' && profile?.decision?.description && activeNav !== 'simulations');
+          const badgeColor = id === 'issues' ? 'var(--danger)' : 'var(--primary)';
           return (
             <button
               key={id}
@@ -77,6 +81,7 @@ export function NavSidebar() {
                 background: isActive ? 'rgba(0,102,102,0.08)' : 'transparent',
                 boxShadow: isActive ? 'var(--shadow-out-sm)' : 'none',
                 color: isActive ? 'var(--primary)' : '#64748b',
+                position: 'relative',
               }}
               onMouseEnter={e => {
                 if (!isActive) {
@@ -91,7 +96,18 @@ export function NavSidebar() {
                 }
               }}
             >
-              <Icon size={16} style={{ flexShrink: 0, strokeWidth: isActive ? 2.2 : 1.8 }} />
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <Icon size={16} style={{ strokeWidth: isActive ? 2.2 : 1.8 }} />
+                {showBadge && (
+                  <div style={{
+                    position: 'absolute', top: '-3px', right: '-4px',
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    background: badgeColor,
+                    border: '2px solid var(--surface-light)',
+                    animation: 'badgePulse 2s ease-in-out infinite',
+                  }} />
+                )}
+              </div>
               <span style={{
                 fontFamily: FONT,
                 fontWeight: isActive ? 600 : 400,
@@ -105,39 +121,6 @@ export function NavSidebar() {
           );
         })}
       </div>
-
-      {/* Divider */}
-      <div style={{ height: '1px', background: '#d1d9e0', margin: '12px 6px' }} />
-
-      {/* Help */}
-      <button
-        style={{
-          width: '100%',
-          padding: '10px 12px',
-          borderRadius: '10px',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '11px',
-          background: 'transparent',
-          color: '#64748b',
-          transition: 'all 0.15s ease',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'rgba(0,0,0,0.04)';
-          e.currentTarget.style.color = '#334155';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = '#64748b';
-        }}
-      >
-        <HelpCircle size={16} style={{ flexShrink: 0, strokeWidth: 1.8 }} />
-        <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: '14px', letterSpacing: '-0.005em' }}>
-          Help &amp; Support
-        </span>
-      </button>
 
       {/* User row */}
       <div
