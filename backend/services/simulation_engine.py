@@ -138,7 +138,12 @@ def calculate_monthly_net_worth(
         # 4. Apply outlier events for this month
         for outlier in outliers:
             if outlier.month == label:
-                impact = outlier.amount if outlier.kind == "income" else -outlier.amount
+                positive_kinds = {"income", "benefit", "refund", "rebate"}
+                impact = (
+                    outlier.amount
+                    if (outlier.kind or "").lower() in positive_kinds
+                    else -outlier.amount
+                )
                 if account_balances:
                     primary = next(
                         (n for n in account_balances if "chequing" in n.lower() or "checking" in n.lower()),
