@@ -4,6 +4,22 @@ import { comparisonToFrontend } from './profileAdapter';
 const USE_MOCK = false;
 const API_BASE = '/api';
 
+/**
+ * Fetch the full onboarding conversation history for a user.
+ * Returns an array of { id, role, content, timestamp } message objects.
+ */
+export async function getConversationHistory(userId) {
+  const res = await fetch(`${API_BASE}/chat/history/${encodeURIComponent(userId)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.messages || []).map((msg, i) => ({
+    id: `hist-${i}`,
+    role: msg.role,
+    content: msg.content,
+    timestamp: msg.created_at || null,
+  }));
+}
+
 export async function sendMessage(
   message,
   userId = 'demo-user',

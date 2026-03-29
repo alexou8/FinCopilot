@@ -1,3 +1,4 @@
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -19,6 +20,13 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get("/chat/history/{user_id}")
+async def chat_history(user_id: str):
+    """Return the full onboarding conversation history for a user."""
+    messages = await get_conversation_history(user_id)
+    return {"messages": messages}
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     """Conversational onboarding endpoint.
@@ -37,7 +45,23 @@ async def chat(req: ChatRequest):
     history = await get_conversation_history(req.user_id)
 
     # 2. Select system prompt based on chat mode
-    system_prompt = SIMULATION_CHAT_PROMPT if req.chat_mode == "simulation" else ONBOARDING_SYSTEM_PROMPT
+    if req.chat_mode == "simulation":
+        system_prompt = SIMULATION_CHAT_PROMPT
+        # Inject the user's current financial profile so the simulation LLM
+        # knows their situation from onboarding without re-asking.
+        profile_uid = req.profile_user_id or req.user_id
+        before_profile = await get_comparison_profile(profile_uid, "before")
+        if before_profile:
+            profile_summary = json.dumps(before_profile, indent=2)
+            system_prompt += (
+                "\n\nUSER'S CURRENT FINANCIAL PROFILE (from onboarding):\n"
+                f"{profile_summary}\n\n"
+                "You already know this information — do NOT re-ask questions that "
+                "are answered above. Focus only on how the proposed scenario would "
+                "CHANGE their finances."
+            )
+    else:
+        system_prompt = ONBOARDING_SYSTEM_PROMPT
 
     # 3. Build messages for OpenAI
     messages = [{"role": "system", "content": system_prompt}]

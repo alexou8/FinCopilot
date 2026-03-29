@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { getProfile } from '../services/profileService';
+import { getConversationHistory } from '../services/chatService';
 import { demoProfile } from '../data/demoProfile';
 import { demoConversation } from '../data/demoConversation';
 import { demoIssues } from '../data/demoIssues';
@@ -45,8 +46,9 @@ export function AppProvider({ children, isDemo = false }) {
           name:  session.user.user_metadata?.name ?? session.user.email,
         };
         setAuthUser(user);
-        // Load saved profile from Supabase for this user
+        // Load saved profile and conversation history from backend for this user
         getProfile(user.id).then(fp => { if (fp) setProfile(fp); }).catch(console.error);
+        getConversationHistory(user.id).then(msgs => { if (msgs.length) setMessages(msgs); }).catch(console.error);
       } else {
         setAuthUser(null);
       }
