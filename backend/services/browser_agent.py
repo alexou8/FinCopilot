@@ -29,13 +29,15 @@ logger = logging.getLogger(__name__)
 
 DISPLAY_WIDTH = 1440
 DISPLAY_HEIGHT = 960
-MAX_AGENT_STEPS = 24
+MAX_AGENT_STEPS = 48
 MIN_ANALYZED_PAGES = 4
 MAX_VISITED_PAGE_SUMMARIES = 10
 MAX_CANDIDATE_LINKS = 10
 MAX_ANALYSIS_FINDINGS = 4
 MAX_ANALYSIS_SOLUTIONS = 3
 MAX_ANALYSIS_STEPS = 4
+TOP_SOURCE_REVIEW_TARGET = 3
+FULL_SOURCE_VIEW_THRESHOLD = 0.9
 
 
 ASK_USER_TOOL = {
@@ -114,6 +116,7 @@ class BrowserAgentSession:
     visited_pages: list[dict[str, str]] = field(default_factory=list)
     current_page_context: dict[str, Any] = field(default_factory=dict)
     analysis_report: IssueBrowserAgentAnalysisReport | None = None
+    source_review_progress: dict[str, float] = field(default_factory=dict)
     pause_requested: bool = False
     stop_requested: bool = False
     action_count: int = 0
@@ -369,6 +372,32 @@ class BrowserAgentManager:
                 )
 
             if name == "finish_task":
+                if not self._has_enough_evidence(session):
+                    reminder = self._build_coverage_reminder(session)
+                    session.state = "running"
+                    session.message = reminder
+                    session.step_log.append(reminder)
+                    await self._show_step(session, reminder)
+                    return await client.responses.create(
+                        model=OPENAI_BROWSER_AGENT_MODEL,
+                        previous_response_id=response.id,
+                        tools=self._tools(),
+                        input=[
+                            {
+                                "type": "function_call_output",
+                                "call_id": function_call.call_id,
+                                "output": json.dumps(
+                                    {
+                                        "status": "need_more_evidence",
+                                        "message": reminder,
+                                    }
+                                ),
+                            }
+                        ],
+                        truncation="auto",
+                        reasoning={"summary": "concise"},
+                    )
+
                 session.state = "done"
                 session.active = False
                 session.result = args.get("summary") or "The browser task is complete."
@@ -475,6 +504,24 @@ class BrowserAgentManager:
 
             if decision.decision == "done":
                 if not self._has_enough_evidence(session):
+                    reminder = self._build_coverage_reminder(session)
+                    current_source_url = self._current_tracked_source_url(session)
+                    if current_source_url and not self._source_review_complete(session, current_source_url):
+                        session.step_log.append(reminder)
+                        decision = VisionBrowserDecision(
+                            decision="action",
+                            narration=reminder,
+                            type="scroll",
+                            scroll_y=720,
+                        )
+                        normalized = self._normalize_vision_decision(session, decision)
+                        await self._execute_action(session, normalized)
+                        session.current_url = session.page.url if session.page else session.current_url
+                        session.action_count += 1
+                        session.step_log.append(self._describe_action(normalized))
+                        steps_taken += 1
+                        continue
+
                     next_url = self._pick_next_navigation_url(session)
                     if next_url:
                         session.step_log.append(
@@ -571,6 +618,15 @@ class BrowserAgentManager:
         source_lines = "\n".join(
             f"- {item.get('title', 'Source')}: {item.get('url', '')}" for item in sources[:6]
         ) or "- Start with the currently open page."
+        source_progress_lines = self._format_source_review_lines(session)
+        required_source_reviews = self._required_source_review_count(session)
+        top_source_rules = (
+            f"- Before finishing, fully review the first {required_source_reviews} candidate source(s) when available.\n"
+            f"- A tracked source only counts as fully reviewed after you open that source page and see at least {int(FULL_SOURCE_VIEW_THRESHOLD * 100)}% of it, unless the page is already short enough to fit on screen.\n"
+            "- Prioritize the listed candidate sources in order before exploring extra links.\n"
+            if required_source_reviews
+            else "- Prioritize the listed candidate sources in order before exploring extra links.\n"
+        )
 
         step_lines = "\n".join(
             f"- {item.get('title')}: {item.get('action')}" for item in (research.get("steps") or [])[:5]
@@ -598,12 +654,15 @@ class BrowserAgentManager:
             f"{step_lines}\n\n"
             "Candidate sources:\n"
             f"{source_lines}\n\n"
+            "Tracked top-source coverage:\n"
+            f"{source_progress_lines}\n\n"
             "Recommended end-state:\n"
             f"{recommendation_lines}\n\n"
             "Important behavior rules:\n"
             "- Narrate progress through your reasoning summary in short, concrete language.\n"
             "- Keep the user in control when the page asks for personal information or when a safety warning appears.\n"
             "- Prefer reading and comparing current public information over pushing deep into a site.\n"
+            f"{top_source_rules}"
             "- Stop once you have enough evidence to help the user decide what to do next."
         )
 
@@ -631,13 +690,15 @@ class BrowserAgentManager:
         ) or "- No candidate links extracted from the current page."
         page_snapshot = current_page.get("text_snippet") or "No text snapshot available yet."
         headings = ", ".join(current_page.get("headings", [])[:5]) or "No headings captured."
-        target_pages = max(
-            2,
-            min(
-                MIN_ANALYZED_PAGES,
-                len({urlparse(item.get('url', '')).netloc for item in (research.get("sources") or []) if item.get("url")})
-                or MIN_ANALYZED_PAGES,
-            ),
+        target_pages, target_domains = self._coverage_targets(session)
+        required_source_reviews = self._required_source_review_count(session)
+        source_progress_lines = self._format_source_review_lines(session)
+        coverage_rules = (
+            f"- Do not finish until you have fully reviewed at least {required_source_reviews} of the top candidate source(s), unless fewer than that were provided.\n"
+            f"- A tracked source counts as fully reviewed only after its page has reached at least {int(FULL_SOURCE_VIEW_THRESHOLD * 100)}% view coverage or is clearly short enough to fit on screen.\n"
+            "- If the current tracked source is not fully reviewed yet, prefer scrolling before moving elsewhere.\n"
+            if required_source_reviews
+            else "- Prefer scrolling or opening another trusted page before finishing if coverage still looks thin.\n"
         )
 
         return (
@@ -663,6 +724,8 @@ class BrowserAgentManager:
             f"{step_lines}\n\n"
             "Candidate sources:\n"
             f"{source_lines}\n\n"
+            "Tracked top-source coverage:\n"
+            f"{source_progress_lines}\n\n"
             "Relevant extracted links from the current page:\n"
             f"{candidate_links}\n\n"
             "Pages already analyzed:\n"
@@ -670,7 +733,8 @@ class BrowserAgentManager:
             "Recent step history:\n"
             f"{history_lines}\n\n"
             "Coverage requirement:\n"
-            f"- Do not finish until you have analyzed at least {target_pages} trusted pages or exhausted the candidate sources and relevant internal links.\n\n"
+            f"- Do not finish until you have analyzed at least {target_pages} trusted page(s) across at least {target_domains} domain(s).\n"
+            f"{coverage_rules}\n"
             "For action decisions:\n"
             "- For click, double_click, or move: provide x and y.\n"
             "- For scroll: provide scroll_y, and optionally x and y.\n"
@@ -814,7 +878,7 @@ class BrowserAgentManager:
                 ]
             )[:3]
             if not evidence_urls:
-                evidence_urls = allowed_urls[:2]
+                evidence_urls = allowed_urls[:3]
 
             sanitized_solutions.append(
                 IssueBrowserAgentPotentialSolution(
@@ -882,7 +946,7 @@ class BrowserAgentManager:
                 description=item.get("description") or "Review the guided research summary.",
                 tradeoffs=item.get("expected_impact")
                 or "Confirm the current details on an official page before acting.",
-                evidence_urls=evidence_urls[:2],
+                evidence_urls=evidence_urls[:3],
             )
             for item in (research.get("recommendations") or [])[:MAX_ANALYSIS_SOLUTIONS]
         ]
@@ -956,14 +1020,14 @@ class BrowserAgentManager:
     def _has_enough_evidence(self, session: BrowserAgentSession) -> bool:
         pages_analyzed = len(session.visited_pages)
         domains_analyzed = len({page["domain"] for page in session.visited_pages})
-        available_source_domains = {
-            urlparse(item.get("url", "")).netloc
-            for item in (session.research.get("sources") or [])
-            if item.get("url")
-        }
-        target_pages = max(2, min(MIN_ANALYZED_PAGES, len(available_source_domains) or MIN_ANALYZED_PAGES))
-        target_domains = max(1, min(2, len(available_source_domains) or 1))
-        return pages_analyzed >= target_pages and domains_analyzed >= target_domains
+        required_source_reviews = self._required_source_review_count(session)
+        completed_source_reviews = self._count_completed_source_reviews(session)
+        target_pages, target_domains = self._coverage_targets(session)
+        return (
+            pages_analyzed >= target_pages
+            and domains_analyzed >= target_domains
+            and completed_source_reviews >= required_source_reviews
+        )
 
     def _pick_next_navigation_url(self, session: BrowserAgentSession) -> str | None:
         visited = {page["url"] for page in session.visited_pages}
@@ -977,6 +1041,10 @@ class BrowserAgentManager:
 
         current_domain = urlparse(session.current_url or "").netloc
         current_candidates = session.current_page_context.get("candidate_links", [])
+        for url in self._tracked_source_urls(session):
+            if url and not self._source_review_complete(session, url) and not self._urls_match(url, session.current_url or ""):
+                return url
+
         for link in current_candidates:
             url = link.get("url")
             if url and url not in visited:
@@ -1199,6 +1267,13 @@ class BrowserAgentManager:
                     url: window.location.href,
                     headings,
                     text_snippet: bodyText.slice(0, 1800),
+                    scroll_y: window.scrollY || document.documentElement?.scrollTop || 0,
+                    viewport_height: window.innerHeight || document.documentElement?.clientHeight || 0,
+                    document_height: Math.max(
+                      document.documentElement?.scrollHeight || 0,
+                      document.body?.scrollHeight || 0,
+                      window.innerHeight || 0
+                    ),
                     links,
                   };
                 }"""
@@ -1214,6 +1289,7 @@ class BrowserAgentManager:
             "domain": current_domain,
             "headings": raw_context.get("headings") or [],
             "text_snippet": raw_context.get("text_snippet") or "",
+            "view_progress": self._compute_view_progress(raw_context),
             "candidate_links": self._rank_candidate_links(
                 session,
                 current_url,
@@ -1222,6 +1298,7 @@ class BrowserAgentManager:
         }
         session.current_page_context = context
         session.current_url = context["url"]
+        self._update_source_review_progress(session, context)
         self._record_visited_page(session, context)
         return context
 
@@ -1314,6 +1391,132 @@ class BrowserAgentManager:
         session.visited_pages.append(snapshot)
         if len(session.visited_pages) > MAX_VISITED_PAGE_SUMMARIES:
             session.visited_pages = session.visited_pages[-MAX_VISITED_PAGE_SUMMARIES:]
+
+    def _coverage_targets(self, session: BrowserAgentSession) -> tuple[int, int]:
+        available_source_domains = {
+            urlparse(item.get("url", "")).netloc
+            for item in (session.research.get("sources") or [])
+            if item.get("url")
+        }
+        required_source_reviews = self._required_source_review_count(session)
+        target_pages = max(
+            2,
+            required_source_reviews,
+            min(MIN_ANALYZED_PAGES, len(available_source_domains) or MIN_ANALYZED_PAGES),
+        )
+        target_domains = max(1, min(2, len(available_source_domains) or 1))
+        return target_pages, target_domains
+
+    def _required_source_review_count(self, session: BrowserAgentSession) -> int:
+        return len(self._tracked_source_urls(session))
+
+    def _tracked_source_urls(self, session: BrowserAgentSession) -> list[str]:
+        return self._dedupe_strings(
+            [
+                item.get("url", "")
+                for item in (session.research.get("sources") or [])
+                if item.get("url")
+            ]
+        )[:TOP_SOURCE_REVIEW_TARGET]
+
+    def _count_completed_source_reviews(self, session: BrowserAgentSession) -> int:
+        return sum(
+            1
+            for url in self._tracked_source_urls(session)
+            if self._source_review_complete(session, url)
+        )
+
+    def _source_review_complete(self, session: BrowserAgentSession, url: str) -> bool:
+        return session.source_review_progress.get(url, 0.0) >= FULL_SOURCE_VIEW_THRESHOLD
+
+    def _build_coverage_reminder(self, session: BrowserAgentSession) -> str:
+        required_source_reviews = self._required_source_review_count(session)
+        completed_source_reviews = self._count_completed_source_reviews(session)
+        target_pages, target_domains = self._coverage_targets(session)
+        pages_analyzed = len(session.visited_pages)
+        domains_analyzed = len({page["domain"] for page in session.visited_pages})
+        incomplete_sources = [
+            f"{self._source_label(session, url)} ({int(round(session.source_review_progress.get(url, 0.0) * 100))}% viewed)"
+            for url in self._tracked_source_urls(session)
+            if not self._source_review_complete(session, url)
+        ]
+
+        reminder = (
+            f"Keep going: fully review {required_source_reviews} top source(s) before finishing "
+            f"({completed_source_reviews}/{required_source_reviews} complete; "
+            f"{pages_analyzed}/{target_pages} page(s), {domains_analyzed}/{target_domains} domain(s))."
+            if required_source_reviews
+            else f"Keep going: gather broader coverage before finishing ({pages_analyzed}/{target_pages} page(s), {domains_analyzed}/{target_domains} domain(s))."
+        )
+        if incomplete_sources:
+            reminder = f"{reminder} Incomplete tracked sources: {', '.join(incomplete_sources[:TOP_SOURCE_REVIEW_TARGET])}."
+        return reminder
+
+    def _format_source_review_lines(self, session: BrowserAgentSession) -> str:
+        tracked_urls = self._tracked_source_urls(session)
+        if not tracked_urls:
+            return "- No tracked source URLs."
+
+        lines: list[str] = []
+        for url in tracked_urls:
+            progress = session.source_review_progress.get(url, 0.0)
+            status = (
+                "complete"
+                if progress >= FULL_SOURCE_VIEW_THRESHOLD
+                else f"{int(round(progress * 100))}% viewed"
+            )
+            lines.append(f"- {self._source_label(session, url)}: {url} [{status}]")
+        return "\n".join(lines)
+
+    def _source_label(self, session: BrowserAgentSession, url: str) -> str:
+        for item in (session.research.get("sources") or []):
+            if self._urls_match(item.get("url", ""), url):
+                return item.get("title") or urlparse(url).netloc or "Source"
+        return urlparse(url).netloc or "Source"
+
+    def _current_tracked_source_url(self, session: BrowserAgentSession) -> str | None:
+        current_url = session.current_url or ""
+        for url in self._tracked_source_urls(session):
+            if self._urls_match(current_url, url):
+                return url
+        return None
+
+    def _normalize_match_url(self, url: str) -> str:
+        parsed = urlparse((url or "").strip())
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        path = parsed.path.rstrip("/") or "/"
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
+
+    def _urls_match(self, left: str, right: str) -> bool:
+        return self._normalize_match_url(left) == self._normalize_match_url(right)
+
+    def _compute_view_progress(self, raw_context: dict[str, Any]) -> float:
+        viewport_height = int(raw_context.get("viewport_height") or 0)
+        document_height = int(raw_context.get("document_height") or 0)
+        scroll_y = int(raw_context.get("scroll_y") or 0)
+        if document_height <= 0 or viewport_height <= 0:
+            return 0.0
+        if document_height <= viewport_height + 24:
+            return 1.0
+        return max(0.0, min(1.0, (scroll_y + viewport_height) / document_height))
+
+    def _update_source_review_progress(
+        self,
+        session: BrowserAgentSession,
+        context: dict[str, Any],
+    ) -> None:
+        current_url = context.get("url", "")
+        if not current_url:
+            return
+
+        progress = float(context.get("view_progress") or 0.0)
+        for url in self._tracked_source_urls(session):
+            if self._urls_match(current_url, url):
+                session.source_review_progress[url] = max(
+                    progress,
+                    session.source_review_progress.get(url, 0.0),
+                )
 
     def _extract_reasoning_summary(self, response: Any) -> str | None:
         for item in getattr(response, "output", []) or []:

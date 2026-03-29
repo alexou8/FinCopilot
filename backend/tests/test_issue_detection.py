@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import unittest
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
@@ -512,6 +513,10 @@ class BrowserAgentAnalysisReportTests(unittest.TestCase):
             "Opened the first trusted page: High Interest Savings Accounts (www.ratehub.ca)",
             "Compared APY and no-fee account details.",
         ]
+        session.source_review_progress = {
+            "https://www.ratehub.ca/savings-accounts/accounts/high-interest": 1.0,
+            "https://www.canada.ca/en/financial-consumer-agency.html": 1.0,
+        }
         return session
 
     def test_get_status_returns_pending_analysis_report(self):
@@ -580,3 +585,58 @@ class BrowserAgentAnalysisReportTests(unittest.TestCase):
         self.assertEqual(session.analysis_report.status, "limited")
         self.assertGreaterEqual(len(session.analysis_report.potential_solutions), 1)
         self.assertTrue(session.analysis_report.coverage_note)
+
+    def test_has_enough_evidence_requires_top_sources_to_be_fully_reviewed(self):
+        manager = BrowserAgentManager()
+        session = self._session()
+        session.source_review_progress = {
+            "https://www.ratehub.ca/savings-accounts/accounts/high-interest": 1.0,
+            "https://www.canada.ca/en/financial-consumer-agency.html": 0.45,
+        }
+
+        self.assertFalse(manager._has_enough_evidence(session))
+
+        session.source_review_progress["https://www.canada.ca/en/financial-consumer-agency.html"] = 1.0
+
+        self.assertTrue(manager._has_enough_evidence(session))
+
+    def test_finish_task_is_rejected_until_source_coverage_is_sufficient(self):
+        manager = BrowserAgentManager()
+        session = self._session()
+        session.state = "running"
+        session.active = True
+        session.source_review_progress = {
+            "https://www.ratehub.ca/savings-accounts/accounts/high-interest": 1.0,
+            "https://www.canada.ca/en/financial-consumer-agency.html": 0.3,
+        }
+
+        response = type(
+            "Response",
+            (),
+            {
+                "id": "resp_1",
+                "output": [
+                    type(
+                        "FunctionCall",
+                        (),
+                        {
+                            "type": "function_call",
+                            "name": "finish_task",
+                            "arguments": json.dumps({"summary": "Done"}),
+                            "call_id": "call_1",
+                        },
+                    )()
+                ],
+            },
+        )()
+
+        with patch(
+            "backend.services.browser_agent.client.responses.create",
+            new=AsyncMock(return_value="continued"),
+        ), patch.object(manager, "_show_step", new=AsyncMock()):
+            next_response = asyncio.run(manager._handle_model_response(session, response))
+
+        self.assertEqual(next_response, "continued")
+        self.assertEqual(session.state, "running")
+        self.assertTrue(session.active)
+        self.assertIn("Keep going: fully review", session.message)
