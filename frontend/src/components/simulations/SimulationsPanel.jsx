@@ -35,7 +35,7 @@ export function SimulationsPanel() {
     setIsRunning(true);
     setRunError(null);
     try {
-      await run(prompt);
+      return await run(prompt);
     } catch (err) {
       if (err instanceof SimulationError) {
         const friendlyMessages = {
@@ -47,6 +47,7 @@ export function SimulationsPanel() {
       } else {
         setRunError({ message: 'Something went wrong. Please try again.', code: 'UNKNOWN' });
       }
+      return null;
     } finally {
       setIsRunning(false);
     }

@@ -48,11 +48,15 @@ in the conversation. Do not guess or infer values that were not explicitly state
 RULES:
 - Return ONLY the JSON object, with no markdown or explanation.
 - The caller will tell you whether to update the "before" or "after" profile. Set profile_label to exactly that value.
-- If the user mentions no income sources, debts, recurring expenses, accounts, or outliers yet, use an empty array [].
+- For BEFORE extraction, if the user mentions no income sources, debts, recurring expenses, accounts, or outliers yet, use an empty array [].
+- For AFTER extraction, the caller may also provide the existing BEFORE profile. Treat that as the baseline: if the user does not mention a financial data point changing, leave it unchanged from BEFORE instead of dropping it to zero or an empty array.
+- When the user changes an existing item, return the full updated item with its new amount.
+- If an existing income source, recurring expense, or debt payment goes away in the scenario, keep the item but set its amount or payment to 0 instead of omitting it.
 - If the user has not mentioned a decision yet, set decision to null.
 - "new_recurring_costs" captures costs the decision would add in the after scenario. Use an empty array if none are mentioned.
 - Convert money amounts to numbers.
 - Normalize frequencies to one of: "weekly", "biweekly", "monthly".
+- If the user describes money every two months, every semester, yearly, or any unsupported cadence, convert it into an equivalent monthly amount.
 - If a savings account interest rate is not mentioned, set it to null.
 - If the user explicitly says a savings account earns no interest, set interest_rate to 0.
 - Compute dashboard_summary from the extracted values.
