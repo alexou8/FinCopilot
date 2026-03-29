@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { MessageSquare, AlertTriangle, BarChart2, User, LogOut, Search, Compass } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
@@ -46,12 +47,24 @@ export function NavSidebar() {
         flexShrink: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px', paddingLeft: '6px' }}>
+      <Link
+        href="/"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          marginBottom: '28px',
+          paddingLeft: '6px',
+          textDecoration: 'none',
+          width: 'fit-content',
+        }}
+        title="Go to landing page"
+      >
         <FinCopilotLogo size={34} />
         <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: '15px', color: '#1e293b', letterSpacing: '-0.01em' }}>
           FinCopilot
         </span>
-      </div>
+      </Link>
 
       <div style={{ height: '1px', background: '#d1d9e0', marginBottom: '12px', marginLeft: '6px', marginRight: '6px' }} />
 
