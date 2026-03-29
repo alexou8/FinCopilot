@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { getProfile } from '../services/profileService';
 import { getConversationHistory } from '../services/chatService';
@@ -46,6 +46,49 @@ export function AppProvider({ children, isDemo = false }) {
 
   // UI state — start on simulations in demo so the flagship feature is immediately visible
   const [activeNav, setActiveNav]     = useState(isDemo ? 'simulations' : 'chat');
+
+  // Toast notifications
+  const [toasts, setToasts] = useState([]);
+  const toastTimers = useRef({});
+
+  const addToast = useCallback((message, type = 'success') => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    setToasts(prev => [...prev, { id, message, type }]);
+    toastTimers.current[id] = setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+      delete toastTimers.current[id];
+    }, 3000);
+    return id;
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+    if (toastTimers.current[id]) {
+      clearTimeout(toastTimers.current[id]);
+      delete toastTimers.current[id];
+    }
+  }, []);
+
+  // Onboarding progress — derived from profile fields
+  const ONBOARDING_STEPS = [
+    { key: 'income',   label: 'Income' },
+    { key: 'expenses', label: 'Expenses' },
+    { key: 'debt',     label: 'Debt' },
+    { key: 'accounts', label: 'Accounts' },
+    { key: 'decision', label: 'Decision' },
+  ];
+
+  const onboardingProgress = useMemo(() => {
+    if (!profile) return { step: 0, total: 5, label: 'Income', completed: false };
+    let step = 0;
+    for (const s of ONBOARDING_STEPS) {
+      if (profile[s.key] != null) step++;
+      else break;
+    }
+    const completed = step >= 5;
+    const label = completed ? 'Complete' : ONBOARDING_STEPS[step]?.label ?? 'Income';
+    return { step, total: 5, label, completed };
+  }, [profile]);
 
   // Subscribe to Supabase auth state (no-op in demo mode or when Supabase is not configured)
   useEffect(() => {
@@ -196,6 +239,12 @@ export function AppProvider({ children, isDemo = false }) {
 
       // UI
       activeNav, setActiveNav,
+
+      // Toasts
+      toasts, addToast, dismissToast,
+
+      // Onboarding
+      onboardingProgress,
 
       // Legacy compatibility (some hooks still reference these)
       // TODO: remove once all consumers are migrated

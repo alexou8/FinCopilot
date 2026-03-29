@@ -9,6 +9,7 @@ import { NavSidebar } from './nav/NavSidebar';
 import { TopBar } from './nav/TopBar';
 import { ProfileSidebar } from './profile/ProfileSidebar';
 import { SimulationsPanel } from './simulations/SimulationsPanel';
+import { ToastContainer } from './shared/Toast';
 
 function Layout() {
   const { activeNav, issueAgentTaskId, issueAgentSessionId, issueResearchLoading } = useApp();
@@ -108,6 +109,7 @@ export function AppShell({ isDemo = false }) {
   return (
     <AppProvider isDemo={isDemo}>
       <Layout />
+      <ToastContainer />
     </AppProvider>
   );
 }

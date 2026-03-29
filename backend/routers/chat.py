@@ -62,6 +62,15 @@ async def chat(req: ChatRequest):
             )
     else:
         system_prompt = ONBOARDING_SYSTEM_PROMPT
+        # Inject the user's profile so the AI can give personalized advice post-onboarding
+        before_profile = await get_comparison_profile(req.user_id, "before")
+        if before_profile:
+            profile_summary = json.dumps(before_profile, indent=2)
+            system_prompt += (
+                "\n\nUSER'S CURRENT FINANCIAL PROFILE:\n"
+                f"{profile_summary}\n\n"
+                "Use this data to personalize your advice. Reference their actual numbers."
+            )
 
     # 3. Build messages for OpenAI
     messages = [{"role": "system", "content": system_prompt}]

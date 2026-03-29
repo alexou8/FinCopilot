@@ -4,18 +4,44 @@ import { NeuCard } from '../shared/NeuCard';
 import { NeuBadge } from '../shared/NeuBadge';
 import { NeuButton } from '../shared/NeuButton';
 import { useApp } from '../../context/AppContext';
+import { useChat } from '../../hooks/useChat';
 
 export function IssueCard({ issue }) {
-  const { activeIssue, issueResearchLoading, launchIssueResearch } = useApp();
+  const {
+    activeIssue,
+    issueResearchLoading,
+    launchIssueResearch,
+    setActiveNav,
+    addToast,
+  } = useApp();
+  const { send } = useChat();
+
   const isLaunching =
-    issueResearchLoading && (activeIssue?.rule_id ?? activeIssue?.id) === (issue.rule_id ?? issue.id);
+    issue.actionType === 'research' &&
+    issueResearchLoading &&
+    (activeIssue?.rule_id ?? activeIssue?.id) === (issue.rule_id ?? issue.id);
 
   async function handleAction() {
-    try {
-      await launchIssueResearch(issue);
-    } catch (_error) {
-      // The research workspace renders the failure state.
+    if (issue.actionType === 'research') {
+      try {
+        await launchIssueResearch(issue);
+      } catch (_error) {
+        // The research workspace renders the failure state.
+      }
+      return;
     }
+
+    if (issue.actionType === 'scenario') {
+      setActiveNav('simulations');
+      return;
+    }
+
+    setActiveNav('chat');
+    const prompt = `Help me with this issue: "${issue.title}". ${
+      issue.explanation ? `Context: ${issue.explanation.slice(0, 200)}` : ''
+    }`;
+    setTimeout(() => send(prompt), 300);
+    addToast(`💬 Asking about: ${issue.title}`);
   }
 
   return (
