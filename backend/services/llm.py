@@ -12,10 +12,10 @@ async def chat_completion(
     temperature: float = 0.7,
     json_mode: bool = False,
 ) -> str:
-    """Send a chat completion request to GPT-4o and return the assistant message content."""
+    """Send a chat completion request to GPT-5.4-mini and return the assistant message content."""
     try:
         kwargs: dict = {
-            "model": "gpt-4.1-mini",
+            "model": "gpt-5.4-mini",
             "messages": messages,
             "temperature": temperature,
         }

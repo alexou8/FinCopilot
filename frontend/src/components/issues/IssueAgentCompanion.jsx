@@ -608,7 +608,7 @@ function AnalysisReportCard({ report, meta, compact = false }) {
 }
 
 function SolutionCard({ solution, compact = false }) {
-  const evidenceUrls = compact ? (solution?.evidence_urls || []).slice(0, 2) : (solution?.evidence_urls || []);
+  const evidenceUrls = compact ? (solution?.evidence_urls || []).slice(0, 3) : (solution?.evidence_urls || []);
 
   return (
     <div className="neu-inset-sm" style={{ padding: '14px 16px', borderRadius: '16px' }}>
@@ -750,7 +750,7 @@ function buildDerivedAnalysisReport(task, state, currentMessage, agentError) {
         title: item.title,
         description: item.description,
         tradeoffs: item.expected_impact || 'Verify the current details before acting.',
-        evidence_urls: (task.research?.sources || []).slice(0, 2).map(source => source.url),
+        evidence_urls: (task.research?.sources || []).slice(0, 3).map(source => source.url),
       })),
       recommended_next_steps: (task.research?.steps || []).slice(0, 3).map(step => step.action || step.title),
       coverage_note: 'The live browser run did not finish cleanly, so this report falls back to the guided research brief.',
