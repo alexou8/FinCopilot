@@ -151,6 +151,11 @@ body {
 .neu-input::placeholder { color: var(--ink-subtle); }
 
 /* ── Animations ─────────────────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 @keyframes profileGlow {
   0%   { box-shadow: var(--shadow-out-sm); }
   25%  { box-shadow: var(--shadow-out-sm), 0 0 0 2px var(--primary), 0 0 24px rgba(0,102,102,0.45); }

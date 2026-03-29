@@ -1,23 +1,47 @@
 'use client';
 
-import { useEffect } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IssueCard } from './IssueCard';
 import { getIssues } from '../../services/issuesService';
 
 export function IssuesPanel() {
-  const { issues, setIssues, profile, authUser, isDemo } = useApp();
+  const { issues, setIssues, authUser, isDemo } = useApp();
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
 
-  // Fetch issues from backend whenever this panel mounts (user navigates to Issues tab)
+  // Fetch issues whenever authUser becomes available (Supabase auth is async)
   useEffect(() => {
-    if (isDemo || !profile) return;
-    const userId = authUser?.id ?? 'demo_user';
-    getIssues(userId).then(setIssues).catch(console.error);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isDemo || !authUser?.id) return;
+    setLoading(true);
+    setFetchError(null);
+    getIssues(authUser.id)
+      .then(setIssues)
+      .catch(err => { console.error(err); setFetchError('Could not load issues.'); })
+      .finally(() => setLoading(false));
+  }, [authUser?.id, isDemo]); // re-run when auth resolves
   const critical = issues.filter(i => i.severity === 'critical');
   const warnings  = issues.filter(i => i.severity === 'warning');
   const tips      = issues.filter(i => i.severity === 'tip');
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '16px', padding: '32px' }}>
+        <RefreshCw size={24} style={{ color: 'var(--ink-muted)', animation: 'spin 1s linear infinite' }} />
+        <p style={{ fontSize: '13px', color: 'var(--ink-muted)', fontFamily: 'DM Sans' }}>Analysing your financial profile…</p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '16px', padding: '32px', textAlign: 'center' }}>
+        <AlertTriangle size={24} style={{ color: 'var(--warning)' }} />
+        <p style={{ fontSize: '13px', color: 'var(--ink-muted)', fontFamily: 'DM Sans' }}>{fetchError}</p>
+      </div>
+    );
+  }
 
   if (issues.length === 0) {
     return (
@@ -44,19 +68,19 @@ export function IssuesPanel() {
         {critical.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <p style={{ fontFamily: 'Space Mono', fontSize: '10px', fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Critical</p>
-            {critical.map(i => <IssueCard key={i.id} issue={i} />)}
+            {critical.map(i => <IssueCard key={i.rule_id ?? i.id} issue={i} />)}
           </div>
         )}
         {warnings.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <p style={{ fontFamily: 'Space Mono', fontSize: '10px', fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Warnings</p>
-            {warnings.map(i => <IssueCard key={i.id} issue={i} />)}
+            {warnings.map(i => <IssueCard key={i.rule_id ?? i.id} issue={i} />)}
           </div>
         )}
         {tips.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <p style={{ fontFamily: 'Space Mono', fontSize: '10px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tips</p>
-            {tips.map(i => <IssueCard key={i.id} issue={i} />)}
+            {tips.map(i => <IssueCard key={i.rule_id ?? i.id} issue={i} />)}
           </div>
         )}
       </div>
