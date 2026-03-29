@@ -7,12 +7,34 @@ const API_BASE = '/api';
  * Map a raw SimulationRecord from the backend into the shape expected by the
  * frontend components (SimulationResultView, SimulationHistoryCard, ComparisonChart).
  */
+/**
+ * Compute months-to-goal: how many months of saving at `surplus` to reach `targetAmount`.
+ * Returns null if surplus <= 0 or no target is set.
+ */
+function computeMonthsToGoal(surplus, targetAmount) {
+  if (!targetAmount || surplus <= 0) return null;
+  return Math.ceil(targetAmount / surplus);
+}
+
+/**
+ * Compute emergency fund coverage: how many months of expenses the accounts can cover.
+ * Returns null if monthly expenses are 0.
+ */
+function computeEmergencyFundMonths(accountTotal, monthlyExpenses) {
+  if (!monthlyExpenses || monthlyExpenses <= 0) return null;
+  return Math.round((accountTotal / monthlyExpenses) * 10) / 10;
+}
+
 function apiToFrontend(sim) {
   const before = sim.monthly_net_worth_before || [];
   const after  = sim.monthly_net_worth_after  || [];
   const rec    = sim.recommendation || {};
   const sb     = sim.summary_before || {};
   const sa     = sim.summary_after  || {};
+
+  // Extract decision target from the before-profile (if available)
+  const decision = sim.profile_data_before?.decision;
+  const targetAmount = decision?.target_amount ?? null;
 
   const trajectories = before.map((b, i) => ({
     month:    b.month,
@@ -38,18 +60,19 @@ function apiToFrontend(sim) {
     metrics: {
       current: {
         monthlySavings:      sb.monthly_surplus   ?? 0,
-        monthsToGoal:        null,
-        emergencyFundMonths: null,
+        monthsToGoal:        computeMonthsToGoal(sb.monthly_surplus, targetAmount),
+        emergencyFundMonths: computeEmergencyFundMonths(sb.account_total ?? 0, sb.monthly_expenses ?? 0),
         monthlyInterestPaid: 0,
       },
       scenario: {
         monthlySavings:      sa.monthly_surplus   ?? 0,
-        monthsToGoal:        null,
-        emergencyFundMonths: null,
+        monthsToGoal:        computeMonthsToGoal(sa.monthly_surplus, targetAmount),
+        emergencyFundMonths: computeEmergencyFundMonths(sa.account_total ?? 0, sa.monthly_expenses ?? 0),
         monthlyInterestPaid: 0,
       },
     },
     trajectories,
+    targetAmount,
     // Keep raw fields for debugging / profile pane
     _raw: sim,
   };
