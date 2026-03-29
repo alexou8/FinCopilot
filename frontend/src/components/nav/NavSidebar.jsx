@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquare, AlertTriangle, BarChart2, User, HelpCircle, LogOut } from 'lucide-react';
+import { MessageSquare, AlertTriangle, BarChart2, User, HelpCircle, LogOut, Search, Compass } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { FinCopilotLogo } from '../shared/FinCopilotLogo';
@@ -9,6 +9,8 @@ import { signOut } from '../../services/authService';
 const NAV_ITEMS = [
   { id: 'chat',        icon: MessageSquare, label: 'Chat'        },
   { id: 'issues',      icon: AlertTriangle,  label: 'Issues'      },
+  { id: 'research',    icon: Search,         label: 'Research'    },
+  { id: 'browserAgent', icon: Compass,       label: 'Browser Agent' },
   { id: 'simulations', icon: BarChart2,      label: 'Simulations' },
   { id: 'profile',     icon: User,           label: 'Profile'     },
 ];

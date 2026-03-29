@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "fincopilot": "file:..",
     "framer-motion": "^11.3.19",
     "gsap": "^3.14.2",
     "lucide-react": "^0.441.0",

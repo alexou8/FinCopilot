@@ -8,6 +8,8 @@ import { signOut } from '../../services/authService';
 const PAGE_LABELS = {
   chat:        'Chat',
   issues:      'Issues',
+  research:    'Research',
+  browserAgent:'Browser Agent',
   simulations: 'Simulations',
   profile:     'Profile',
 };

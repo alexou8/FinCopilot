@@ -148,6 +148,101 @@ class IssueDetectResponse(BaseModel):
     issues: list[Issue]
 
 
+class IssueResearchRequest(BaseModel):
+    user_id: str
+    rule_id: str
+
+
+class IssueResearchStep(BaseModel):
+    title: str
+    action: str
+    reason: str
+    source_hint: str | None = None
+
+
+class IssueResearchFinding(BaseModel):
+    label: str
+    value: str
+    detail: str | None = None
+
+
+class IssueResearchRecommendation(BaseModel):
+    title: str
+    description: str
+    expected_impact: str | None = None
+
+
+class IssueResearchSource(BaseModel):
+    title: str
+    url: str
+
+
+class IssueResearchPlan(BaseModel):
+    query: str
+    browser_goal: str
+    summary: str
+    findings: list[IssueResearchFinding]
+    steps: list[IssueResearchStep]
+    recommendations: list[IssueResearchRecommendation]
+
+
+class IssueResearchResponse(BaseModel):
+    rule_id: str
+    title: str
+    action: str
+    mode: Literal["live", "manual"]
+    search_query: str
+    search_url: str
+    browser_goal: str
+    summary: str
+    findings: list[IssueResearchFinding]
+    steps: list[IssueResearchStep]
+    recommendations: list[IssueResearchRecommendation]
+    sources: list[IssueResearchSource]
+
+
+class IssueBrowserAgentStartRequest(BaseModel):
+    user_id: str
+    task_id: str | None = None
+    research: IssueResearchResponse
+
+
+class IssueBrowserAgentStartResponse(BaseModel):
+    session_id: str
+    task_id: str | None = None
+    started: bool
+    state: str
+    message: str
+
+
+class IssueBrowserAgentAnswerRequest(BaseModel):
+    answer: str
+
+
+class IssueBrowserAgentVisitedPage(BaseModel):
+    title: str
+    url: str
+    domain: str
+    snippet: str | None = None
+
+
+class IssueBrowserAgentStatusResponse(BaseModel):
+    session_id: str
+    task_id: str | None = None
+    active: bool
+    state: str
+    message: str | None = None
+    question: str | None = None
+    result: str | None = None
+    current_url: str | None = None
+    error: str | None = None
+    runtime_mode: str | None = None
+    pages_analyzed: int = 0
+    domains_analyzed: int = 0
+    step_log: list[str] = []
+    visited_pages: list[IssueBrowserAgentVisitedPage] = []
+
+
 # ── Scenarios ────────────────────────────────────────────────────────
 
 class ScenarioCompareRequest(BaseModel):

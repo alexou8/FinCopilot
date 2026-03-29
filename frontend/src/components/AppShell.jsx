@@ -2,24 +2,23 @@
 
 import { AppProvider, useApp } from '../context/AppContext';
 import { ChatPanel } from './chat/ChatPanel';
-import { ProfileSidebar } from './profile/ProfileSidebar';
 import { IssuesPanel } from './issues/IssuesPanel';
-import { SimulationsPanel } from './simulations/SimulationsPanel';
+import { IssueAgentCompanion } from './issues/IssueAgentCompanion';
+import { IssueResearchPanel } from './issues/IssueResearchPanel';
 import { NavSidebar } from './nav/NavSidebar';
 import { TopBar } from './nav/TopBar';
+import { ProfileSidebar } from './profile/ProfileSidebar';
+import { SimulationsPanel } from './simulations/SimulationsPanel';
 
 function Layout() {
-  const { activeNav } = useApp();
+  const { activeNav, issueAgentTaskId, issueAgentSessionId, issueResearchLoading } = useApp();
 
-  // Each tab maps to a distinct layout:
-  //  chat        → chat panel only (full width)
-  //  issues      → chat (left) + issues panel (right)
-  //  simulations → full-width SimulationsPanel (history + results side-by-side)
-  //  profile     → full-width ProfileSidebar
-  const showChat        = activeNav === 'chat' || activeNav === 'issues';
-  const showIssues      = activeNav === 'issues';
+  const showChat = activeNav === 'chat' || activeNav === 'issues';
+  const showIssues = activeNav === 'issues';
+  const showResearch = activeNav === 'research';
+  const showBrowserAgent = activeNav === 'browserAgent';
   const showSimulations = activeNav === 'simulations';
-  const showProfile     = activeNav === 'profile';
+  const showProfile = activeNav === 'profile';
 
   return (
     <div
@@ -33,20 +32,31 @@ function Layout() {
         background: 'var(--surface)',
       }}
     >
-      {/* Far-left: Nav Sidebar */}
       <NavSidebar />
 
-      {/* Main content area */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        {/* Top bar */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          overflow: 'hidden',
+        }}
+      >
         <TopBar />
 
-        {/* Panels row */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: '16px' }}>
-
-          {/* Chat + Issues view */}
           {showChat && (
-            <div style={{ flex: showIssues ? '1.4 1 0' : '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div
+              style={{
+                flex: showIssues ? '1.4 1 0' : '1 1 0',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+              }}
+            >
               <ChatPanel />
             </div>
           )}
@@ -59,20 +69,35 @@ function Layout() {
             </div>
           )}
 
-          {/* Simulations: full-width split-pane */}
+          {showResearch && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <IssueResearchPanel />
+            </div>
+          )}
+
+          {showBrowserAgent && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="neu-raised-lg" style={{ flex: 1, overflow: 'hidden' }}>
+                <IssueAgentCompanion
+                  taskId={issueAgentTaskId}
+                  sessionId={issueAgentSessionId}
+                  launching={issueResearchLoading && !issueAgentTaskId}
+                />
+              </div>
+            </div>
+          )}
+
           {showSimulations && (
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <SimulationsPanel />
             </div>
           )}
 
-          {/* Profile: centred, max-width to keep it readable */}
           {showProfile && (
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <ProfileSidebar />
             </div>
           )}
-
         </div>
       </div>
     </div>
