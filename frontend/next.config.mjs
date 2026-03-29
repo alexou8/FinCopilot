@@ -10,7 +10,7 @@ const nextConfig = {
     turbopackFileSystemCacheForDev: false,
   },
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8001';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
     return [
       {
         source: '/api/:path*',
