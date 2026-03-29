@@ -9,7 +9,17 @@ from fastapi.testclient import TestClient
 
 import backend.db as db
 from backend.main import app
-from backend.models.schemas import ComparisonDecision, ComparisonProfile
+from backend.models.schemas import (
+    ComparisonDecision,
+    ComparisonProfile,
+    IssueBrowserAgentStartResponse,
+    IssueBrowserAgentStatusResponse,
+)
+from backend.services.browser_agent import (
+    ASK_USER_TOOL,
+    FINISH_TASK_TOOL,
+    BrowserAgentManager,
+)
 from backend.services.issue_detection import detect_issues
 from backend.services.simulation_engine import project_monthly_balances
 
@@ -254,6 +264,22 @@ class IssueEndpointTests(unittest.TestCase):
         response = self.client.post("/issues/detect", json={"user_id": "missing-user"})
         self.assertEqual(response.status_code, 404)
 
+    def test_profile_route_persists_saved_name(self):
+        response = self.client.put(
+            "/profiles/demo-user",
+            json={
+                "name": "Dev Test",
+                "income": {"amount": 1200, "frequency": "monthly", "is_variable": False},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["name"], "Dev Test")
+
+        follow_up = self.client.get("/profiles/demo-user")
+        self.assertEqual(follow_up.status_code, 200)
+        self.assertEqual(follow_up.json()["name"], "Dev Test")
+
     def test_detect_endpoint_returns_fallback_issue_cards(self):
         healthy = _healthy_profile().model_dump(mode="json")
         profile = _profile_with(
@@ -289,3 +315,119 @@ class IssueEndpointTests(unittest.TestCase):
         self.assertIn("metrics", issue)
         self.assertIn("reasons", issue)
         self.assertTrue(issue["explanation"])
+
+    def test_research_endpoint_returns_manual_plan_when_web_search_fails(self):
+        healthy = _healthy_profile().model_dump(mode="json")
+        profile = _profile_with(
+            accounts=[
+                healthy["accounts"][0],
+                {**healthy["accounts"][1], "interest_rate": 0.5},
+            ]
+        )
+        asyncio.run(
+            db.save_comparison_profile(
+                "demo-user",
+                profile.model_dump(mode="json"),
+                target_profile="before",
+            )
+        )
+
+        with patch(
+            "backend.services.issue_research.client.responses.parse",
+            new=AsyncMock(side_effect=RuntimeError("web search offline")),
+        ):
+            response = self.client.post(
+                "/issues/research",
+                json={"user_id": "demo-user", "rule_id": "low_yield_savings"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["rule_id"], "low_yield_savings")
+        self.assertEqual(payload["mode"], "manual")
+        self.assertTrue(payload["search_query"])
+        self.assertTrue(payload["search_url"].startswith("https://www.google.com/search?q="))
+        self.assertGreaterEqual(len(payload["steps"]), 1)
+        self.assertGreaterEqual(len(payload["recommendations"]), 1)
+
+    def test_browser_agent_start_route_returns_session_payload(self):
+        with patch(
+            "backend.routers.issues.browser_agent_manager.start_session",
+            new=AsyncMock(
+                return_value=IssueBrowserAgentStartResponse(
+                    session_id="session-123",
+                    task_id="task-123",
+                    started=True,
+                    state="running",
+                    message="Launching browser",
+                )
+            ),
+        ):
+            response = self.client.post(
+                "/issues/browser-agent/start",
+                json={
+                    "user_id": "demo-user",
+                    "task_id": "task-123",
+                    "research": {
+                        "rule_id": "low_yield_savings",
+                        "title": "Your savings are earning very little",
+                        "action": "Compare savings options",
+                        "mode": "manual",
+                        "search_query": "best high interest savings account rates Canada",
+                        "search_url": "https://www.google.com/search?q=test",
+                        "browser_goal": "Find better current savings rates.",
+                        "summary": "Compare current HISA options.",
+                        "findings": [],
+                        "steps": [],
+                        "recommendations": [],
+                        "sources": [],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["session_id"], "session-123")
+        self.assertEqual(payload["task_id"], "task-123")
+        self.assertTrue(payload["started"])
+
+    def test_browser_agent_status_route_returns_session_state(self):
+        with patch(
+            "backend.routers.issues.browser_agent_manager.get_status",
+            return_value=IssueBrowserAgentStatusResponse(
+                session_id="session-123",
+                task_id="task-123",
+                active=True,
+                state="question",
+                message="Waiting for input",
+                question="What is the best rate you found?",
+                result=None,
+                current_url="https://example.com",
+                error=None,
+            ),
+        ):
+            response = self.client.get("/issues/browser-agent/status/session-123")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["state"], "question")
+        self.assertEqual(payload["question"], "What is the best rate you found?")
+
+
+class BrowserAgentSchemaTests(unittest.TestCase):
+    def test_strict_function_schemas_require_all_declared_properties(self):
+        ask_user_properties = ASK_USER_TOOL["parameters"]["properties"]
+        ask_user_required = ASK_USER_TOOL["parameters"]["required"]
+        finish_task_properties = FINISH_TASK_TOOL["parameters"]["properties"]
+        finish_task_required = FINISH_TASK_TOOL["parameters"]["required"]
+
+        self.assertEqual(sorted(ask_user_required), sorted(ask_user_properties.keys()))
+        self.assertEqual(sorted(finish_task_required), sorted(finish_task_properties.keys()))
+
+    def test_model_access_error_triggers_vision_fallback(self):
+        manager = BrowserAgentManager()
+        error = RuntimeError(
+            "Error code: 404 - {'error': {'message': 'The model `computer-use-preview` does not exist or you do not have access to it.', 'code': 'model_not_found'}}"
+        )
+
+        self.assertTrue(manager._should_use_vision_fallback(error))

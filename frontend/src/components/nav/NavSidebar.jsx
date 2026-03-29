@@ -1,26 +1,29 @@
 'use client';
 
-import { MessageSquare, AlertTriangle, BarChart2, User, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { MessageSquare, AlertTriangle, BarChart2, User, LogOut, Search, Compass } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { FinCopilotLogo } from '../shared/FinCopilotLogo';
 import { signOut } from '../../services/authService';
 
 const NAV_ITEMS = [
-  { id: 'chat',        icon: MessageSquare, label: 'Chat'        },
-  { id: 'issues',      icon: AlertTriangle,  label: 'Issues'      },
-  { id: 'simulations', icon: BarChart2,      label: 'Simulations' },
-  { id: 'profile',     icon: User,           label: 'Profile'     },
+  { id: 'chat',         icon: MessageSquare, label: 'Chat' },
+  { id: 'issues',       icon: AlertTriangle, label: 'Issues' },
+  { id: 'research',     icon: Search, label: 'Research' },
+  { id: 'browserAgent', icon: Compass, label: 'Browser Agent' },
+  { id: 'simulations',  icon: BarChart2, label: 'Simulations' },
+  { id: 'profile',      icon: User, label: 'Profile' },
 ];
 
 const FONT = "'Inter', 'DM Sans', sans-serif";
 
 export function NavSidebar() {
-  const { activeNav, setActiveNav, profile, authUser, issues, simulations } = useApp();
+  const { activeNav, setActiveNav, profile, authUser, issues } = useApp();
   const router = useRouter();
 
   const fullName = authUser?.name || profile?.name || 'Guest';
-  const email    = authUser?.email || 'Demo mode';
+  const email = authUser?.email || 'Demo mode';
 
   function handleNav(id) {
     setActiveNav(id);
@@ -44,18 +47,27 @@ export function NavSidebar() {
         flexShrink: 0,
       }}
     >
-      {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px', paddingLeft: '6px' }}>
+      <Link
+        href="/"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          marginBottom: '28px',
+          paddingLeft: '6px',
+          textDecoration: 'none',
+          width: 'fit-content',
+        }}
+        title="Go to landing page"
+      >
         <FinCopilotLogo size={34} />
         <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: '15px', color: '#1e293b', letterSpacing: '-0.01em' }}>
           FinCopilot
         </span>
-      </div>
+      </Link>
 
-      {/* Divider */}
       <div style={{ height: '1px', background: '#d1d9e0', marginBottom: '12px', marginLeft: '6px', marginRight: '6px' }} />
 
-      {/* Nav items */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
         {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
           const isActive = activeNav === id;
@@ -63,6 +75,7 @@ export function NavSidebar() {
             (id === 'issues' && issues.length > 0 && activeNav !== 'issues') ||
             (id === 'simulations' && profile?.decision?.description && activeNav !== 'simulations');
           const badgeColor = id === 'issues' ? 'var(--danger)' : 'var(--primary)';
+
           return (
             <button
               key={id}
@@ -83,38 +96,46 @@ export function NavSidebar() {
                 color: isActive ? 'var(--primary)' : '#64748b',
                 position: 'relative',
               }}
-              onMouseEnter={e => {
+              onMouseEnter={event => {
                 if (!isActive) {
-                  e.currentTarget.style.background = 'rgba(0,0,0,0.04)';
-                  e.currentTarget.style.color = '#334155';
+                  event.currentTarget.style.background = 'rgba(0,0,0,0.04)';
+                  event.currentTarget.style.color = '#334155';
                 }
               }}
-              onMouseLeave={e => {
+              onMouseLeave={event => {
                 if (!isActive) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#64748b';
+                  event.currentTarget.style.background = 'transparent';
+                  event.currentTarget.style.color = '#64748b';
                 }
               }}
             >
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <Icon size={16} style={{ strokeWidth: isActive ? 2.2 : 1.8 }} />
                 {showBadge && (
-                  <div style={{
-                    position: 'absolute', top: '-3px', right: '-4px',
-                    width: '8px', height: '8px', borderRadius: '50%',
-                    background: badgeColor,
-                    border: '2px solid var(--surface-light)',
-                    animation: 'badgePulse 2s ease-in-out infinite',
-                  }} />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-3px',
+                      right: '-4px',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: badgeColor,
+                      border: '2px solid var(--surface-light)',
+                      animation: 'badgePulse 2s ease-in-out infinite',
+                    }}
+                  />
                 )}
               </div>
-              <span style={{
-                fontFamily: FONT,
-                fontWeight: isActive ? 600 : 400,
-                fontSize: '14px',
-                letterSpacing: '-0.005em',
-                color: isActive ? 'var(--primary)' : '#64748b',
-              }}>
+              <span
+                style={{
+                  fontFamily: FONT,
+                  fontWeight: isActive ? 600 : 400,
+                  fontSize: '14px',
+                  letterSpacing: '-0.005em',
+                  color: isActive ? 'var(--primary)' : '#64748b',
+                }}
+              >
                 {label}
               </span>
             </button>
@@ -122,7 +143,6 @@ export function NavSidebar() {
         })}
       </div>
 
-      {/* User row */}
       <div
         className="neu-inset-sm"
         style={{
@@ -134,26 +154,50 @@ export function NavSidebar() {
           marginTop: '8px',
         }}
       >
-        <div style={{
-          width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(145deg, var(--primary-light), var(--primary-dark))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '11px', fontFamily: FONT, fontWeight: 600, color: '#fff',
-        }}>
-          {fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+        <div
+          style={{
+            width: '30px',
+            height: '30px',
+            borderRadius: '50%',
+            flexShrink: 0,
+            background: 'linear-gradient(145deg, var(--primary-light), var(--primary-dark))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '11px',
+            fontFamily: FONT,
+            fontWeight: 600,
+            color: '#fff',
+          }}
+        >
+          {fullName.split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase()}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{
-            fontFamily: FONT, fontWeight: 500, fontSize: '13px',
-            color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            letterSpacing: '-0.01em',
-          }}>
+          <p
+            style={{
+              fontFamily: FONT,
+              fontWeight: 500,
+              fontSize: '13px',
+              color: '#1e293b',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              letterSpacing: '-0.01em',
+            }}
+          >
             {fullName}
           </p>
-          <p style={{
-            fontFamily: FONT, fontWeight: 400, fontSize: '10px', color: '#94a3b8',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
+          <p
+            style={{
+              fontFamily: FONT,
+              fontWeight: 400,
+              fontSize: '10px',
+              color: '#94a3b8',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
             {email}
           </p>
         </div>
@@ -161,8 +205,12 @@ export function NavSidebar() {
           title="Sign out"
           onClick={handleSignOut}
           style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px', flexShrink: 0 }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; }}
+          onMouseEnter={event => {
+            event.currentTarget.style.color = 'var(--danger)';
+          }}
+          onMouseLeave={event => {
+            event.currentTarget.style.color = '#94a3b8';
+          }}
         >
           <LogOut size={13} />
         </button>

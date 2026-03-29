@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { User, Mail, Lock, Plus, Trash2, Pencil, Check, X, TrendingUp } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { User, Mail, Lock, Plus, Trash2, Pencil, Check, X, TrendingUp, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { NeuButton } from '../shared/NeuButton';
 import { NeuProgressBar } from '../shared/NeuProgressBar';
 import { updateProfile } from '../../services/profileService';
+import { signOut, updateUserName } from '../../services/authService';
 
 const FONT = 'DM Sans, sans-serif';
 const MONO = 'JetBrains Mono, monospace';
@@ -63,16 +65,54 @@ function InlineField({ label, value, onChange, type = 'text', prefix }) {
 // ─── Account tab ──────────────────────────────────────────────────────────────
 
 function AccountTab({ profile, authUser }) {
-  const { setProfile } = useApp();
+  const { setProfile, setAuthUser, addToast, isDemo } = useApp();
+  const router = useRouter();
   const [editName, setEditName]   = useState(false);
-  const [nameVal, setNameVal]     = useState(profile?.name || '');
+  const [nameVal, setNameVal]     = useState(profile?.name || authUser?.name || '');
+  const [isSavingName, setIsSavingName] = useState(false);
   const [editEmail, setEditEmail] = useState(false);
   const [emailVal, setEmailVal]   = useState(authUser?.email || 'alex.chen@laurier.ca');
 
-  function saveName() {
-    setProfile(prev => ({ ...prev, name: nameVal }));
+  useEffect(() => {
+    if (!editName) {
+      setNameVal(profile?.name || authUser?.name || '');
+    }
+  }, [profile?.name, authUser?.name, editName]);
+
+  useEffect(() => {
+    if (!editEmail) {
+      setEmailVal(authUser?.email || 'alex.chen@laurier.ca');
+    }
+  }, [authUser?.email, editEmail]);
+
+  async function saveName() {
+    const normalizedName = nameVal.trim() || authUser?.name || 'Your Profile';
+    const nextProfile = { ...(profile || {}), name: normalizedName };
+    const userId = authUser?.id || 'demo_user';
+
+    setIsSavingName(true);
+    try {
+      const savedProfile = isDemo
+        ? nextProfile
+        : await updateProfile(userId, nextProfile);
+
+      setProfile(savedProfile || nextProfile);
+      setAuthUser(prev => (prev ? { ...prev, name: normalizedName } : prev));
+
+      const { error } = await updateUserName(normalizedName);
+      if (error) {
+        console.error('Supabase name update failed:', error);
+      }
+
+      addToast('Profile name saved.');
+      setEditName(false);
+    } catch (error) {
+      console.error('Profile name save failed:', error);
+      addToast('Could not save profile name.', 'error');
+    } finally {
+      setIsSavingName(false);
+    }
     // TODO: authService.updateUserName(nameVal) → Supabase auth.updateUser
-    setEditName(false);
   }
 
   function saveEmail() {
@@ -80,7 +120,14 @@ function AccountTab({ profile, authUser }) {
     setEditEmail(false);
   }
 
-  const initials = nameVal.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  async function handleSignOut() {
+    await signOut();
+    router.push('/login');
+  }
+
+  const displayName = nameVal.trim() || authUser?.name || 'Your Profile';
+  const initials = displayName.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'FP';
+  const profileMeta = [profile?.year, profile?.school].filter(Boolean).join(' · ');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '4px 0' }}>
@@ -101,20 +148,20 @@ function AccountTab({ profile, authUser }) {
               autoFocus
               value={nameVal}
               onChange={e => setNameVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditName(false); }}
+              onKeyDown={e => { if (e.key === 'Enter' && !isSavingName) saveName(); if (e.key === 'Escape' && !isSavingName) setEditName(false); }}
               className="neu-input"
               style={{ padding: '8px 12px', fontSize: '14px', fontFamily: FONT, fontWeight: 600, textAlign: 'center', flex: 1 }}
             />
-            <button onClick={saveName} style={{ ...iconBtn, color: 'var(--success)' }}><Check size={15} /></button>
-            <button onClick={() => setEditName(false)} style={{ ...iconBtn, color: 'var(--danger)' }}><X size={15} /></button>
+            <button onClick={saveName} disabled={isSavingName} style={{ ...iconBtn, color: 'var(--success)', opacity: isSavingName ? 0.5 : 1 }}><Check size={15} /></button>
+            <button onClick={() => setEditName(false)} disabled={isSavingName} style={{ ...iconBtn, color: 'var(--danger)', opacity: isSavingName ? 0.5 : 1 }}><X size={15} /></button>
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: '18px', color: 'var(--ink)' }}>{nameVal}</h2>
+            <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: '18px', color: 'var(--ink)' }}>{displayName}</h2>
             <button onClick={() => setEditName(true)} style={iconBtn} title="Edit name"><Pencil size={13} /></button>
           </div>
         )}
-        {profile && (
+        {profileMeta && (
           <span style={{ fontSize: '13px', color: 'var(--ink-muted)', fontFamily: FONT }}>
             {profile.year} · {profile.school}
           </span>
@@ -166,6 +213,25 @@ function AccountTab({ profile, authUser }) {
             Send reset link
           </NeuButton>
         </div>
+
+        {!isDemo && authUser && (
+          <div style={{ paddingTop: '12px', borderTop: '1px solid var(--surface-dark)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--ink-muted)', fontFamily: FONT, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+                  Session
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--ink-subtle)', fontFamily: FONT }}>
+                  Sign out is now available here instead of the dashboard header.
+                </p>
+              </div>
+              <NeuButton size="sm" onClick={handleSignOut}>
+                <LogOut size={14} />
+                Sign out
+              </NeuButton>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

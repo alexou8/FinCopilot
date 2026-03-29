@@ -11,20 +11,27 @@ function generateId() {
 }
 
 const FIELD_TOAST_MAP = {
-  income:   '💰 Income updated',
-  expenses: '📊 Expenses recorded',
-  debt:     '💳 Debt info captured',
-  accounts: '🏦 Accounts linked',
-  decision: '🎯 Goal detected',
+  income: { message: 'Income updated', type: 'income' },
+  expenses: { message: 'Expenses recorded', type: 'expenses' },
+  debt: { message: 'Debt info captured', type: 'debt' },
+  accounts: { message: 'Accounts linked', type: 'accounts' },
+  decision: { message: 'Goal detected', type: 'decision' },
 };
 
 export function useChat() {
   const {
-    addMessage, setIsTyping, setProfile, updateProfileField,
-    authUser, setActivePanel, setScenario, setIssues,
-    addToast, setActiveNav,
+    addMessage,
+    setIsTyping,
+    setProfile,
+    updateProfileField,
+    authUser,
+    setActivePanel,
+    setScenario,
+    setIssues,
+    addToast,
+    setActiveNav,
   } = useApp();
-  // Track whether we've already fetched issues for this session to avoid repeat calls
+
   const issuesFetchedRef = useRef(false);
 
   const send = useCallback(async (text) => {
@@ -51,34 +58,35 @@ export function useChat() {
       addMessage(aiMsg);
 
       if (response.profileUpdates) {
-        // Only merge non-null sections so a partial extraction doesn't clear existing data
         const update = Object.fromEntries(
-          Object.entries(response.profileUpdates).filter(([, v]) => v != null)
+          Object.entries(response.profileUpdates).filter(([, value]) => value != null)
         );
+
         if (Object.keys(update).length > 0) {
           setProfile(prev => ({ ...(prev || {}), ...update }));
           Object.keys(update).forEach(field => {
             updateProfileField(field);
-            // Toast notification for each captured field
-            if (FIELD_TOAST_MAP[field]) {
-              addToast(FIELD_TOAST_MAP[field]);
+            const toastConfig = FIELD_TOAST_MAP[field];
+            if (toastConfig) {
+              addToast(toastConfig.message, toastConfig.type);
             }
           });
         }
 
-        // Auto-fetch issues once onboarding is complete (decision detected)
         if (update.decision?.description && !issuesFetchedRef.current) {
           issuesFetchedRef.current = true;
           getIssues(userId)
             .then(issues => {
               setIssues(issues);
-              // Show completion toast and auto-navigate to Issues tab
-              addToast(`✨ Profile complete! ${issues.length} issue${issues.length !== 1 ? 's' : ''} found`);
+              addToast(
+                `Profile complete. ${issues.length} issue${issues.length !== 1 ? 's' : ''} found.`,
+                'success'
+              );
               setTimeout(() => {
                 setActiveNav('issues');
               }, 1500);
             })
-            .catch(err => console.error('Auto-fetch issues failed:', err));
+            .catch(error => console.error('Auto-fetch issues failed:', error));
         }
       }
 
@@ -86,7 +94,7 @@ export function useChat() {
         setScenario(demoScenario);
         setActivePanel('scenario');
       }
-    } catch (err) {
+    } catch (_error) {
       addMessage({
         id: generateId(),
         role: 'assistant',
@@ -97,8 +105,18 @@ export function useChat() {
     } finally {
       setIsTyping(false);
     }
-  }, [addMessage, setIsTyping, setProfile, updateProfileField, authUser, setActivePanel, setScenario, setIssues, addToast, setActiveNav]);
+  }, [
+    addMessage,
+    setIsTyping,
+    setProfile,
+    updateProfileField,
+    authUser,
+    setActivePanel,
+    setScenario,
+    setIssues,
+    addToast,
+    setActiveNav,
+  ]);
 
   return { send };
 }
-

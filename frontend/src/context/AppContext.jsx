@@ -4,6 +4,13 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef, us
 import { supabase } from '../lib/supabase';
 import { getProfile } from '../services/profileService';
 import { getConversationHistory } from '../services/chatService';
+import { startBrowserAgent } from '../services/browserAgentService';
+import { getIssueResearch } from '../services/issueResearchService';
+import {
+  buildIssueAgentTask,
+  saveIssueAgentTask,
+  updateIssueAgentTask,
+} from '../lib/issueAgent';
 import { demoProfile } from '../data/demoProfile';
 import { demoConversation } from '../data/demoConversation';
 import { demoIssues } from '../data/demoIssues';
@@ -22,6 +29,12 @@ export function AppProvider({ children, isDemo = false }) {
 
   // Issues
   const [issues, setIssues]           = useState(isDemo ? demoIssues : []);
+  const [activeIssue, setActiveIssue] = useState(null);
+  const [issueResearch, setIssueResearch] = useState(null);
+  const [issueResearchLoading, setIssueResearchLoading] = useState(false);
+  const [issueResearchError, setIssueResearchError] = useState(null);
+  const [issueAgentTaskId, setIssueAgentTaskId] = useState(null);
+  const [issueAgentSessionId, setIssueAgentSessionId] = useState(null);
 
   // Simulations (replaces single scenario)
   const [simulations, setSimulations] = useState(isDemo ? demoSimulations : []);
@@ -112,6 +125,79 @@ export function AppProvider({ children, isDemo = false }) {
     setMessages(prev => [...prev, msg]);
   }, []);
 
+  const openIssueAgentTab = useCallback(() => {
+    setActiveNav('browserAgent');
+    return null;
+  }, [setActiveNav]);
+
+  const launchIssueResearch = useCallback(async (issue) => {
+    const ruleId = issue?.rule_id ?? issue?.ruleId;
+    if (!ruleId) {
+      throw new Error('Issue rule_id is required');
+    }
+
+    setActiveIssue(issue);
+    setIssueResearch(null);
+    setIssueResearchError(null);
+    setIssueResearchLoading(true);
+    setActiveNav('browserAgent');
+
+    try {
+      const research = await getIssueResearch({
+        userId: authUser?.id ?? 'demo-user',
+        ruleId,
+        issue,
+        isDemo,
+      });
+      let task = buildIssueAgentTask({ issue, research });
+      saveIssueAgentTask(task);
+      setIssueAgentTaskId(task.taskId);
+      setIssueAgentSessionId(null);
+      setIssueResearch(research);
+
+      if (!isDemo) {
+        try {
+          const session = await startBrowserAgent({
+            userId: authUser?.id ?? 'demo-user',
+            taskId: task.taskId,
+            research,
+          });
+
+          task = updateIssueAgentTask(task.taskId, current => ({
+            ...current,
+            sessionId: session.session_id,
+            runtime: {
+              state: session.state,
+              message: session.message,
+              active: true,
+            },
+          })) || task;
+
+          setIssueAgentSessionId(session.session_id);
+        } catch (agentError) {
+          console.error('Visible browser agent failed to start:', agentError);
+          task = updateIssueAgentTask(task.taskId, current => ({
+            ...current,
+            agentUnavailableReason: agentError.message || 'Visible browser agent unavailable.',
+            runtime: {
+              state: 'failed',
+              message: agentError.message || 'Visible browser agent unavailable.',
+              active: false,
+            },
+          })) || task;
+        }
+      }
+
+      return research;
+    } catch (error) {
+      console.error('Issue research failed:', error);
+      setIssueResearchError('Could not load guided issue research.');
+      throw error;
+    } finally {
+      setIssueResearchLoading(false);
+    }
+  }, [authUser?.id, isDemo, setActiveNav]);
+
   const updateProfileField = useCallback((field) => {
     setUpdatedFields(prev => ({ ...prev, [field]: Date.now() }));
     setTimeout(() => {
@@ -135,6 +221,14 @@ export function AppProvider({ children, isDemo = false }) {
 
       // Issues
       issues, setIssues,
+      activeIssue, setActiveIssue,
+      issueResearch, setIssueResearch,
+      issueResearchLoading, setIssueResearchLoading,
+      issueResearchError, setIssueResearchError,
+      issueAgentTaskId, setIssueAgentTaskId,
+      issueAgentSessionId, setIssueAgentSessionId,
+      launchIssueResearch,
+      openIssueAgentTab,
 
       // Simulations
       simulations, setSimulations,

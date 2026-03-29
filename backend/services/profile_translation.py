@@ -84,6 +84,7 @@ def comparison_to_legacy(profile: ComparisonProfile) -> FinancialProfile:
         )
 
     return FinancialProfile(
+        name=profile.name,
         income=income,
         expenses=expenses,
         debt=debt,
@@ -168,6 +169,7 @@ def legacy_to_comparison(
         )
 
     return ComparisonProfile(
+        name=profile.name,
         profile_label=profile_label,
         scenario_name=scenario_name,
         income_sources=income_sources,
