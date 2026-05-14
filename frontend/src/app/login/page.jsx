@@ -136,7 +136,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    // When Supabase is not configured (static demo build), land in demo mode
+    router.push(supabase ? '/dashboard' : '/dashboard?demo=true');
   }
 
   async function handleGoogleSignIn() {
