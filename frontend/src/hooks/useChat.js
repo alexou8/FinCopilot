@@ -5,13 +5,7 @@ import { useApp } from '../context/AppContext';
 import { sendMessage } from '../services/chatService';
 import { getIssues } from '../services/issuesService';
 import { demoScenario } from '../data/demoScenario';
-
-const DEMO_REPLIES = [
-  "This is a live demo — full AI chat requires a connected backend. Feel free to explore the profile, issues, and simulations panels using the sidebar!",
-  "In the full version, I'd parse that and update your financial profile in real time. For now, check out the Issues and Simulations tabs to see what the platform can do.",
-  "Great question! In a live session I'd respond with personalised guidance. Try clicking 'Issues' in the sidebar to see detected financial risks for the demo profile.",
-  "I'm running in demo mode, so I can't process new messages — but the rest of the dashboard is fully interactive. Try the Simulations panel to model financial scenarios.",
-];
+import { getMockResponse } from '../data/demoConversation';
 
 function generateId() {
   return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -24,8 +18,6 @@ const FIELD_TOAST_MAP = {
   accounts: { message: 'Accounts linked', type: 'accounts' },
   decision: { message: 'Goal detected', type: 'decision' },
 };
-
-let demoReplyIndex = 0;
 
 export function useChat() {
   const {
@@ -57,14 +49,14 @@ export function useChat() {
     setIsTyping(true);
 
     if (isDemo) {
-      await new Promise(r => setTimeout(r, 700 + Math.random() * 500));
+      await new Promise(r => setTimeout(r, 800 + Math.random() * 600));
+      const mockResponse = getMockResponse(text);
       addMessage({
         id: generateId(),
         role: 'assistant',
-        content: DEMO_REPLIES[demoReplyIndex % DEMO_REPLIES.length],
+        content: mockResponse.aiMessage,
         timestamp: new Date().toISOString(),
       });
-      demoReplyIndex++;
       setIsTyping(false);
       return;
     }
@@ -139,6 +131,7 @@ export function useChat() {
     setIssues,
     addToast,
     setActiveNav,
+    isDemo,
   ]);
 
   return { send };
