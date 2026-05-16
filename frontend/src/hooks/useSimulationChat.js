@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { sendMessage } from '../services/chatService';
+import { getDemoSimulationChatReply } from '../data/demoSimulations';
 
 function generateId() {
   return `sim-msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -17,7 +18,7 @@ function generateId() {
  * the onboarding chat.
  */
 export function useSimulationChat() {
-  const { authUser } = useApp();
+  const { authUser, isDemo } = useApp();
   const [simMessages, setSimMessages] = useState([]);
   const [isSimTyping, setIsSimTyping] = useState(false);
 
@@ -35,6 +36,18 @@ export function useSimulationChat() {
     };
     setSimMessages(prev => [...prev, userMsg]);
     setIsSimTyping(true);
+
+    if (isDemo) {
+      await new Promise(r => setTimeout(r, 900 + Math.random() * 700));
+      setSimMessages(prev => [...prev, {
+        id: generateId(),
+        role: 'assistant',
+        content: getDemoSimulationChatReply(text),
+        timestamp: new Date().toISOString(),
+      }]);
+      setIsSimTyping(false);
+      return;
+    }
 
     try {
       const response = await sendMessage(
@@ -62,7 +75,7 @@ export function useSimulationChat() {
     } finally {
       setIsSimTyping(false);
     }
-  }, [simMessages.length, userId, simConvId]);
+  }, [isDemo, simMessages.length, userId, simConvId]);
 
   const scenarioPrompt = simMessages
     .filter(message => message.role === 'user')

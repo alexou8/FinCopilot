@@ -35,8 +35,9 @@ jobs:
       - name: Build static site
         working-directory: frontend
         env:
-          GITHUB_PAGES: true
-          # No Supabase or backend env vars — the build runs in pure demo mode
+          GITHUB_PAGES: 'true'
+          NEXT_PUBLIC_GITHUB_PAGES: 'true'
+          # No Supabase or backend env vars — the build runs in full interactive demo mode
         run: npm run build
 
       - name: Upload Pages artifact
